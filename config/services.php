@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'facturapi' => [
+        'key' => env('FACTURAPI_SECRET_KEY'),
+        'base_url' => env('FACTURAPI_BASE_URL', 'https://www.facturapi.io/v2'),
+    ],
+
 ];

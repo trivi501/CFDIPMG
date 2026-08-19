@@ -1,5 +1,16 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import {
+    BookOpen,
+    FileCheck2,
+    FolderGit2,
+    KeyRound,
+    LayoutGrid,
+    Package,
+    Receipt,
+    ShieldCheck,
+    UserCog,
+    Users,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -13,16 +24,16 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { usePermissions } from '@/hooks/use-permissions';
 import { dashboard } from '@/routes';
+import apiClients from '@/routes/api-clients';
+import customers from '@/routes/customers';
+import invoices from '@/routes/invoices';
+import products from '@/routes/products';
+import receipts from '@/routes/receipts';
+import roles from '@/routes/roles';
+import users from '@/routes/users';
 import type { NavItem } from '@/types';
-
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
 
 const footerNavItems: NavItem[] = [
     {
@@ -38,6 +49,70 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { can } = usePermissions();
+
+    const mainNavItems: NavItem[] = [
+        { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+    ];
+
+    if (can('receipts.view')) {
+        mainNavItems.push({
+            title: 'Recibos',
+            href: receipts.index(),
+            icon: Receipt,
+        });
+    }
+
+    if (can('invoices.view')) {
+        mainNavItems.push({
+            title: 'Facturas',
+            href: invoices.index(),
+            icon: FileCheck2,
+        });
+    }
+
+    if (can('customers.view')) {
+        mainNavItems.push({
+            title: 'Clientes',
+            href: customers.index(),
+            icon: Users,
+        });
+    }
+
+    if (can('products.view')) {
+        mainNavItems.push({
+            title: 'Productos',
+            href: products.index(),
+            icon: Package,
+        });
+    }
+
+    const adminNavItems: NavItem[] = [];
+
+    if (can('users.manage')) {
+        adminNavItems.push({
+            title: 'Usuarios',
+            href: users.index(),
+            icon: UserCog,
+        });
+    }
+
+    if (can('roles.manage')) {
+        adminNavItems.push({
+            title: 'Roles y permisos',
+            href: roles.index(),
+            icon: ShieldCheck,
+        });
+    }
+
+    if (can('api-clients.manage')) {
+        adminNavItems.push({
+            title: 'API clients',
+            href: apiClients.index(),
+            icon: KeyRound,
+        });
+    }
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -54,6 +129,7 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <NavMain items={mainNavItems} />
+                <NavMain items={adminNavItems} label="Administración" />
             </SidebarContent>
 
             <SidebarFooter>
