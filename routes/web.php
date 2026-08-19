@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReceiptController;
+use App\Http\Controllers\ReceiptLookupController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +18,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('permission:receipts.view')->group(function () {
         Route::get('receipts', [ReceiptController::class, 'index'])->name('receipts.index');
+        Route::get('receipts/lookup', [ReceiptLookupController::class, 'create'])
+            ->middleware('permission:receipts.import')
+            ->name('receipts.lookup.create');
+        Route::post('receipts/lookup', [ReceiptLookupController::class, 'store'])
+            ->middleware('permission:receipts.import')
+            ->name('receipts.lookup.store');
         Route::get('receipts/{receipt}/invoice', [ReceiptController::class, 'create'])
             ->middleware('permission:invoices.create')
             ->name('receipts.invoice.create');

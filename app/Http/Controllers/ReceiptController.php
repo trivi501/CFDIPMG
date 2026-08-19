@@ -29,11 +29,55 @@ class ReceiptController extends Controller
 
     public function create(PaymentReceipt $receipt): Response
     {
+        $pagos = $this->resolvePagosContext($receipt);
+
         return Inertia::render('receipts/invoice', [
             'receipt' => $receipt,
             'customers' => Customer::orderBy('legal_name')->get(['id', 'legal_name', 'rfc']),
             'products' => Product::where('is_active', true)->orderBy('description')->get(),
+            'pagos' => $pagos['data'] ?? null,
+            'suggestedCustomerId' => $pagos['suggestedCustomerId'] ?? null,
+            'suggestedPaymentForm' => $pagos['suggestedPaymentForm'] ?? null,
         ]);
+    }
+
+    /**
+     * Best-effort extraction of the rich payload returned by the external "Pagos"
+     * system (contribuyente, datos_facturacion, predio, conceptos, formas_pago, caja)
+     * so the invoicing form can display it and pre-fill what it safely can. Falls
+     * back to nulls when a field isn't present instead of assuming an exact shape.
+     *
+     * @return array{data: array<string, mixed>, suggestedCustomerId: int|null, suggestedPaymentForm: string|null}|null
+     */
+    protected function resolvePagosContext(PaymentReceipt $receipt): ?array
+    {
+        if ($receipt->source_system !== ReceiptLookupController::SOURCE_SYSTEM) {
+            return null;
+        }
+
+        $payload = $receipt->customer_payload ?? [];
+
+        $rfc = data_get($payload, 'datos_facturacion.rfc');
+        $customer = null;
+
+        if (is_string($rfc) && $rfc !== '' && $rfc !== '—') {
+            $customer = Customer::where('rfc', strtoupper($rfc))->first();
+        }
+
+        $claveSat = data_get($payload, 'formas_pago.0.clave_sat');
+
+        return [
+            'data' => [
+                'contribuyente' => $payload['contribuyente'] ?? null,
+                'datos_facturacion' => $payload['datos_facturacion'] ?? null,
+                'predio' => $payload['predio'] ?? null,
+                'conceptos' => $payload['conceptos'] ?? [],
+                'formas_pago' => $payload['formas_pago'] ?? [],
+                'caja' => $payload['caja'] ?? null,
+            ],
+            'suggestedCustomerId' => $customer?->id,
+            'suggestedPaymentForm' => $claveSat !== null ? str_pad((string) $claveSat, 2, '0', STR_PAD_LEFT) : null,
+        ];
     }
 
     public function store(Request $request, PaymentReceipt $receipt, InvoiceService $invoiceService): RedirectResponse

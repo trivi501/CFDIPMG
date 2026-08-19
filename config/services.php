@@ -40,4 +40,9 @@ return [
         'base_url' => env('FACTURAPI_BASE_URL', 'https://www.facturapi.io/v2'),
     ],
 
+    'pagos' => [
+        'base_url' => env('PAGOS_API_BASE_URL'),
+        'token' => env('PAGOS_API_TOKEN'),
+    ],
+
 ];

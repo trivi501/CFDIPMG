@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { Search } from 'lucide-react';
 import Heading from '@/components/heading';
 import { Pagination } from '@/components/pagination';
 import type { Paginator } from '@/components/pagination';
@@ -65,10 +66,19 @@ export default function ReceiptsIndex({
         <>
             <Head title="Recibos" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                <Heading
-                    title="Recibos de pago"
-                    description="Recibos recibidos del sistema externo, listos para facturar."
-                />
+                <div className="flex items-center justify-between">
+                    <Heading
+                        title="Recibos de pago"
+                        description="Recibos recibidos del sistema externo, listos para facturar."
+                    />
+                    {can('receipts.import') && (
+                        <Button asChild>
+                            <Link href={receipts.lookup.create()}>
+                                <Search /> Checar folio para facturar
+                            </Link>
+                        </Button>
+                    )}
+                </div>
 
                 <div className="flex gap-1">
                     {[

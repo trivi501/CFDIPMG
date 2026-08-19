@@ -7,6 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { CFDI_USES, PAYMENT_FORMS, PAYMENT_METHODS } from '@/lib/sat-catalogs';
 import { dashboard } from '@/routes';
 import receipts from '@/routes/receipts';
@@ -39,6 +47,64 @@ type Item = {
     unit_price: string;
 };
 
+type JsonRecord = Record<string, unknown>;
+
+type PagosConcepto = {
+    cuenta_codigo?: string;
+    cuenta_descripcion?: string;
+    concepto?: string;
+    cantidad?: number;
+    monto?: number;
+};
+
+type PagosFormaPago = {
+    forma_pago?: string;
+    clave_sat?: string;
+    monto?: number;
+};
+
+type PagosContext = {
+    contribuyente: JsonRecord | null;
+    datos_facturacion: JsonRecord | null;
+    predio: JsonRecord | null;
+    conceptos: PagosConcepto[];
+    formas_pago: PagosFormaPago[];
+    caja: JsonRecord | null;
+};
+
+function humanizeKey(key: string): string {
+    return key.charAt(0).toUpperCase() + key.slice(1).replaceAll('_', ' ');
+}
+
+function DataList({ data }: { data: JsonRecord }) {
+    const entries = Object.entries(data).filter(
+        ([, value]) => value !== null && value !== undefined && value !== '',
+    );
+
+    if (entries.length === 0) {
+        return <p className="text-sm text-muted-foreground">Sin datos.</p>;
+    }
+
+    return (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            {entries.map(([key, value]) => (
+                <div key={key} className="contents">
+                    <dt className="text-muted-foreground">
+                        {humanizeKey(key)}
+                    </dt>
+                    <dd>
+                        {typeof value === 'object' ? (
+                            <DataList data={value as JsonRecord} />
+                        ) : (
+                            String(value)
+                        )}
+                    </dd>
+                </div>
+            ))}
+        </dl>
+    );
+}
+
 function emptyItem(receipt: Receipt): Item {
     return {
         description: receipt.concept ?? '',
@@ -53,14 +119,20 @@ export default function ReceiptInvoice({
     receipt,
     customers,
     products,
+    pagos,
+    suggestedCustomerId,
+    suggestedPaymentForm,
 }: {
     receipt: Receipt;
     customers: Customer[];
     products: Product[];
+    pagos: PagosContext | null;
+    suggestedCustomerId: number | null;
+    suggestedPaymentForm: string | null;
 }) {
     const { data, setData, post, processing, errors } = useForm({
-        customer_id: '',
-        payment_form: '03',
+        customer_id: suggestedCustomerId ? String(suggestedCustomerId) : '',
+        payment_form: suggestedPaymentForm ?? '03',
         payment_method: 'PUE',
         use: 'G03',
         items: [emptyItem(receipt)] as Item[],
@@ -231,6 +303,154 @@ export default function ReceiptInvoice({
                             </div>
                         </CardContent>
                     </Card>
+
+                    {pagos && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>
+                                    Datos del pago (sistema de Pagos
+                                    municipales)
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {pagos.contribuyente && (
+                                    <div>
+                                        <p className="mb-1 text-sm font-medium">
+                                            Contribuyente
+                                        </p>
+                                        <DataList data={pagos.contribuyente} />
+                                    </div>
+                                )}
+
+                                {pagos.datos_facturacion ? (
+                                    <div>
+                                        <p className="mb-1 text-sm font-medium">
+                                            Datos de facturación capturados
+                                        </p>
+                                        <DataList
+                                            data={pagos.datos_facturacion}
+                                        />
+                                        {!suggestedCustomerId && (
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                No encontramos un cliente con
+                                                ese RFC ya registrado: crea o
+                                                elige el cliente manualmente
+                                                arriba usando estos datos.
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">
+                                        Este contribuyente no tiene datos de
+                                        facturación capturados en el sistema de
+                                        pagos. Selecciona o crea el cliente
+                                        manualmente.
+                                    </p>
+                                )}
+
+                                {pagos.predio && (
+                                    <div>
+                                        <p className="mb-1 text-sm font-medium">
+                                            Predio
+                                        </p>
+                                        <DataList data={pagos.predio} />
+                                    </div>
+                                )}
+
+                                {pagos.conceptos.length > 0 && (
+                                    <div>
+                                        <p className="mb-1 text-sm font-medium">
+                                            Desglose de conceptos
+                                        </p>
+                                        <div className="rounded-lg border">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>
+                                                            Cuenta
+                                                        </TableHead>
+                                                        <TableHead>
+                                                            Concepto
+                                                        </TableHead>
+                                                        <TableHead className="text-right">
+                                                            Monto
+                                                        </TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {pagos.conceptos.map(
+                                                        (concepto, index) => (
+                                                            <TableRow
+                                                                key={index}
+                                                            >
+                                                                <TableCell className="text-xs">
+                                                                    {
+                                                                        concepto.cuenta_codigo
+                                                                    }
+                                                                    <span className="block text-muted-foreground">
+                                                                        {
+                                                                            concepto.cuenta_descripcion
+                                                                        }
+                                                                    </span>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    {
+                                                                        concepto.concepto
+                                                                    }
+                                                                </TableCell>
+                                                                <TableCell className="text-right">
+                                                                    {currency.format(
+                                                                        Number(
+                                                                            concepto.monto ??
+                                                                                0,
+                                                                        ),
+                                                                    )}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ),
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {pagos.formas_pago.length > 0 && (
+                                    <div>
+                                        <p className="mb-1 text-sm font-medium">
+                                            Formas de pago registradas
+                                        </p>
+                                        <ul className="text-sm">
+                                            {pagos.formas_pago.map(
+                                                (forma, index) => (
+                                                    <li key={index}>
+                                                        {forma.forma_pago}{' '}
+                                                        (clave SAT{' '}
+                                                        {forma.clave_sat}) —{' '}
+                                                        {currency.format(
+                                                            Number(
+                                                                forma.monto ??
+                                                                    0,
+                                                            ),
+                                                        )}
+                                                    </li>
+                                                ),
+                                            )}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {pagos.caja && (
+                                    <div>
+                                        <p className="mb-1 text-sm font-medium">
+                                            Caja
+                                        </p>
+                                        <DataList data={pagos.caja} />
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <Card>
                         <CardHeader className="flex-row items-center justify-between">
