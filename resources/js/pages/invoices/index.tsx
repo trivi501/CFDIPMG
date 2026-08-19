@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 import Heading from '@/components/heading';
 import { Pagination } from '@/components/pagination';
 import type { Paginator } from '@/components/pagination';
@@ -13,6 +14,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { usePermissions } from '@/hooks/use-permissions';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
 
@@ -56,14 +58,25 @@ export default function InvoicesIndex({
     invoices: paginator,
     filters,
 }: PageProps) {
+    const { can } = usePermissions();
+
     return (
         <>
             <Head title="Facturas" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                <Heading
-                    title="Facturas"
-                    description="CFDI generados a partir de los recibos de pago."
-                />
+                <div className="flex items-center justify-between">
+                    <Heading
+                        title="Facturas"
+                        description="CFDI generados a partir de los recibos de pago."
+                    />
+                    {can('invoices.create') && (
+                        <Button asChild>
+                            <Link href={invoices.create()}>
+                                <Plus /> Factura abierta
+                            </Link>
+                        </Button>
+                    )}
+                </div>
 
                 <div className="flex gap-1">
                     {[undefined, 'valid', 'canceled', 'failed'].map(
