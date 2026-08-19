@@ -96,6 +96,40 @@ class InvoiceGenerationTest extends TestCase
         $this->assertSame('fact_cus_123', $customer->fresh()->facturapi_customer_id);
     }
 
+    public function test_an_already_invoiced_receipt_cannot_be_invoiced_again(): void
+    {
+        Http::fake([
+            'www.facturapi.io/v2/customers' => Http::response(['id' => 'fact_cus_123'], 201),
+            'www.facturapi.io/v2/invoices' => Http::response(['id' => 'fact_inv_123', 'uuid' => 'uuid-1234'], 201),
+        ]);
+
+        $customer = Customer::create([
+            'legal_name' => 'Cliente de Prueba',
+            'rfc' => 'XAXX010101000',
+            'tax_system' => '616',
+            'zip' => '01000',
+        ]);
+
+        $receipt = $this->pendingReceipt();
+        $user = $this->billingUser();
+
+        $this->actingAs($user)->post("/receipts/{$receipt->id}/invoice", $this->invoiceFormPayload($customer));
+
+        $invoiceId = $receipt->fresh()->invoice_id;
+
+        // Visiting the form again (e.g. via the browser back button) should bounce to the invoice, not show the form.
+        $this->actingAs($user)
+            ->get("/receipts/{$receipt->id}/invoice")
+            ->assertRedirect("/invoices/{$invoiceId}");
+
+        // Resubmitting it should not create a second invoice either.
+        $this->actingAs($user)
+            ->post("/receipts/{$receipt->id}/invoice", $this->invoiceFormPayload($customer))
+            ->assertRedirect("/invoices/{$invoiceId}");
+
+        $this->assertSame(1, $customer->invoices()->count());
+    }
+
     public function test_it_records_a_failed_invoice_when_facturapi_rejects_the_request(): void
     {
         Http::fake([

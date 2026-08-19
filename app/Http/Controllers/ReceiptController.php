@@ -27,8 +27,14 @@ class ReceiptController extends Controller
         ]);
     }
 
-    public function create(PaymentReceipt $receipt): Response
+    public function create(PaymentReceipt $receipt): Response|RedirectResponse
     {
+        if ($receipt->status === 'invoiced') {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Este recibo ya fue facturado.']);
+
+            return to_route('invoices.show', $receipt->invoice_id);
+        }
+
         $pagos = $this->resolvePagosContext($receipt);
 
         return Inertia::render('receipts/invoice', [
@@ -99,7 +105,7 @@ class ReceiptController extends Controller
         if ($receipt->status === 'invoiced') {
             Inertia::flash('toast', ['type' => 'error', 'message' => 'Este recibo ya fue facturado.']);
 
-            return to_route('receipts.index');
+            return to_route('invoices.show', $receipt->invoice_id);
         }
 
         $customer = Customer::query()->where('id', $data['customer_id'])->firstOrFail();
