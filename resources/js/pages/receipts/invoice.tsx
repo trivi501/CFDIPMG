@@ -122,6 +122,7 @@ export default function ReceiptInvoice({
     pagos,
     suggestedCustomerId,
     suggestedPaymentForm,
+    taxIncludedInPrice,
 }: {
     receipt: Receipt;
     customers: Customer[];
@@ -129,6 +130,7 @@ export default function ReceiptInvoice({
     pagos: PagosContext | null;
     suggestedCustomerId: number | null;
     suggestedPaymentForm: string | null;
+    taxIncludedInPrice: boolean;
 }) {
     const { data, setData, post, processing, errors } = useForm({
         customer_id: suggestedCustomerId ? String(suggestedCustomerId) : '',
@@ -571,7 +573,9 @@ export default function ReceiptInvoice({
                                         </div>
                                         <div className="grid gap-2">
                                             <Label>
-                                                Precio unitario (sin IVA)
+                                                {taxIncludedInPrice
+                                                    ? 'Precio unitario (IVA incluido)'
+                                                    : 'Precio unitario (sin IVA)'}
                                             </Label>
                                             <Input
                                                 type="number"
@@ -592,13 +596,33 @@ export default function ReceiptInvoice({
                             ))}
 
                             <div className="text-right text-sm">
-                                <p className="text-muted-foreground">
-                                    Subtotal: {currency.format(total)} · IVA
-                                    (16%): {currency.format(total * 0.16)}
-                                </p>
-                                <p className="text-lg font-semibold">
-                                    Total: {currency.format(total * 1.16)}
-                                </p>
+                                {taxIncludedInPrice ? (
+                                    <>
+                                        <p className="text-muted-foreground">
+                                            Base gravable:{' '}
+                                            {currency.format(total / 1.16)} ·
+                                            IVA incluido (16%):{' '}
+                                            {currency.format(
+                                                total - total / 1.16,
+                                            )}
+                                        </p>
+                                        <p className="text-lg font-semibold">
+                                            Total: {currency.format(total)}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-muted-foreground">
+                                            Subtotal: {currency.format(total)} ·
+                                            IVA (16%):{' '}
+                                            {currency.format(total * 0.16)}
+                                        </p>
+                                        <p className="text-lg font-semibold">
+                                            Total:{' '}
+                                            {currency.format(total * 1.16)}
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

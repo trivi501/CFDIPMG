@@ -11,8 +11,6 @@ use Inertia\Response;
 
 class ReceiptLookupController extends Controller
 {
-    public const SOURCE_SYSTEM = 'pagos_municipales';
-
     public function create(): Response
     {
         return Inertia::render('receipts/lookup');
@@ -43,7 +41,7 @@ class ReceiptLookupController extends Controller
 
         $receipt = PaymentReceipt::firstOrCreate(
             [
-                'source_system' => self::SOURCE_SYSTEM,
+                'source_system' => PaymentReceipt::SOURCE_PAGOS_MUNICIPALES,
                 'external_id' => $pago['folio'] ?? $data['folio'],
             ],
             [

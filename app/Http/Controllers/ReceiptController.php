@@ -38,6 +38,7 @@ class ReceiptController extends Controller
             'pagos' => $pagos['data'] ?? null,
             'suggestedCustomerId' => $pagos['suggestedCustomerId'] ?? null,
             'suggestedPaymentForm' => $pagos['suggestedPaymentForm'] ?? null,
+            'taxIncludedInPrice' => $receipt->source_system === PaymentReceipt::SOURCE_PAGOS_MUNICIPALES,
         ]);
     }
 
@@ -51,7 +52,7 @@ class ReceiptController extends Controller
      */
     protected function resolvePagosContext(PaymentReceipt $receipt): ?array
     {
-        if ($receipt->source_system !== ReceiptLookupController::SOURCE_SYSTEM) {
+        if ($receipt->source_system !== PaymentReceipt::SOURCE_PAGOS_MUNICIPALES) {
             return null;
         }
 

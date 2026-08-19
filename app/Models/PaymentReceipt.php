@@ -10,6 +10,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PaymentReceipt extends Model
 {
+    /**
+     * source_system value for receipts pulled from the municipal Pagos API
+     * (predial/property tax payments) via ReceiptLookupController. Their
+     * amounts already include IVA, unlike manually-priced items elsewhere.
+     */
+    public const SOURCE_PAGOS_MUNICIPALES = 'pagos_municipales';
+
     protected $fillable = [
         'external_id',
         'source_system',

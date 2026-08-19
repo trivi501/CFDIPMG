@@ -23,6 +23,10 @@ class InvoiceService
     {
         $total = collect($items)->sum(fn (array $item) => $item['quantity'] * $item['unit_price']);
 
+        // Payments pulled from the municipal Pagos system (predial) already have IVA
+        // baked into their amount, unlike manually-priced items elsewhere in the app.
+        $taxIncluded = $receipt->source_system === PaymentReceipt::SOURCE_PAGOS_MUNICIPALES;
+
         try {
             $facturapiCustomerId = $customer->facturapi_customer_id
                 ?? $this->syncCustomerToFacturapi($customer);
@@ -36,7 +40,7 @@ class InvoiceService
                         'product_key' => $item['sat_product_key'],
                         'unit_key' => $item['sat_unit_key'],
                         'price' => $item['unit_price'],
-                        'tax_included' => false,
+                        'tax_included' => $taxIncluded,
                         'taxes' => [
                             ['type' => 'IVA', 'rate' => 0.16, 'factor' => 'Tasa'],
                         ],
