@@ -11,13 +11,6 @@ use Inertia\Response;
 
 class ReceiptLookupController extends Controller
 {
-    /**
-     * "Pagos generales" here means the Ingresos category in the external Pagos
-     * system (as opposed to predial_urbano/predial_rustico) — general income
-     * payments that aren't tied to a specific property tax account.
-     */
-    protected const TIPO_PAGO_GENERALES = 'Ingresos';
-
     public function create(): Response
     {
         return Inertia::render('receipts/lookup');
@@ -26,9 +19,8 @@ class ReceiptLookupController extends Controller
     public function index(PagosClient $pagos): Response
     {
         $result = $pagos->list([
-            'tipo_pago' => self::TIPO_PAGO_GENERALES,
             'estatus' => 'pagado',
-            'per_page' => 100,
+            'per_page' => 200,
         ]);
 
         $pagosList = collect($result['data']);
@@ -46,6 +38,7 @@ class ReceiptLookupController extends Controller
                 return [
                     'folio' => $pago['folio'],
                     'fecha' => $pago['fecha'] ?? null,
+                    'tipo_pago' => $pago['tipo_pago'] ?? null,
                     'descripcion' => $pago['descripcion'] ?? null,
                     'monto' => $pago['monto'] ?? 0,
                     'contribuyente_nombre' => $pago['contribuyente']['nombre'] ?? null,

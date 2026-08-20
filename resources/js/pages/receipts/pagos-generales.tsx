@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import pagosGenerales from '@/routes/receipts/pagos-generales';
 type Pago = {
     folio: string;
     fecha: string | null;
+    tipo_pago: string | null;
     descripcion: string | null;
     monto: number;
     contribuyente_nombre: string | null;
@@ -33,6 +35,20 @@ const currency = new Intl.NumberFormat('es-MX', {
 });
 
 export default function PagosGenerales({ pagos }: { pagos: Pago[] }) {
+    const [tipoFilter, setTipoFilter] = useState<string | null>(null);
+
+    const tipos = useMemo(
+        () =>
+            Array.from(
+                new Set(pagos.map((pago) => pago.tipo_pago).filter(Boolean)),
+            ) as string[],
+        [pagos],
+    );
+
+    const filteredPagos = tipoFilter
+        ? pagos.filter((pago) => pago.tipo_pago === tipoFilter)
+        : pagos;
+
     const facturar = (folio: string) => {
         router.post(receiptsLookup.store().url, { folio });
     };
@@ -43,14 +59,47 @@ export default function PagosGenerales({ pagos }: { pagos: Pago[] }) {
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <Heading
                     title="Pagos generales"
-                    description='Ingresos pagados en el sistema de Pagos municipales, listos para facturar (categoría "Ingresos").'
+                    description="Pagos pagados en el sistema de Pagos municipales, listos para facturar."
                 />
+
+                {tipos.length > 1 && (
+                    <div className="flex flex-wrap gap-1">
+                        <Button
+                            variant={
+                                tipoFilter === null ? 'default' : 'outline'
+                            }
+                            size="sm"
+                            onClick={() => setTipoFilter(null)}
+                        >
+                            Todos ({pagos.length})
+                        </Button>
+                        {tipos.map((tipo) => (
+                            <Button
+                                key={tipo}
+                                variant={
+                                    tipoFilter === tipo ? 'default' : 'outline'
+                                }
+                                size="sm"
+                                onClick={() => setTipoFilter(tipo)}
+                            >
+                                {tipo} (
+                                {
+                                    pagos.filter(
+                                        (pago) => pago.tipo_pago === tipo,
+                                    ).length
+                                }
+                                )
+                            </Button>
+                        ))}
+                    </div>
+                )}
 
                 <div className="rounded-xl border">
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Folio</TableHead>
+                                <TableHead>Tipo</TableHead>
                                 <TableHead>Fecha</TableHead>
                                 <TableHead>Contribuyente</TableHead>
                                 <TableHead>Descripción</TableHead>
@@ -62,15 +111,18 @@ export default function PagosGenerales({ pagos }: { pagos: Pago[] }) {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {pagos.length === 0 && (
-                                <TableEmpty colSpan={7}>
-                                    No hay pagos generales pendientes.
+                            {filteredPagos.length === 0 && (
+                                <TableEmpty colSpan={8}>
+                                    No hay pagos que coincidan.
                                 </TableEmpty>
                             )}
-                            {pagos.map((pago) => (
+                            {filteredPagos.map((pago) => (
                                 <TableRow key={pago.folio}>
                                     <TableCell className="font-mono text-xs">
                                         {pago.folio}
+                                    </TableCell>
+                                    <TableCell>
+                                        {pago.tipo_pago ?? '—'}
                                     </TableCell>
                                     <TableCell>{pago.fecha ?? '—'}</TableCell>
                                     <TableCell>

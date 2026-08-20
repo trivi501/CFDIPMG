@@ -176,7 +176,30 @@ class ReceiptLookupTest extends TestCase
             ->where('pagos.1.folio', 'CG-000002')
             ->where('pagos.1.receipt_status', null));
 
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'tipo_pago=Ingresos')
-            && str_contains($request->url(), 'estatus=pagado'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'estatus=pagado')
+            && ! str_contains($request->url(), 'tipo_pago='));
+    }
+
+    public function test_it_lists_pagos_of_every_tipo_pago_not_just_ingresos(): void
+    {
+        Http::fake([
+            'localhost:8080/api/pagos*' => Http::response([
+                'data' => [
+                    $this->pagoPayload(['folio' => 'CG-000001', 'tipo_pago' => 'Ingresos']),
+                    $this->pagoPayload(['folio' => 'PAG-000098', 'tipo_pago' => 'predial_urbano']),
+                    $this->pagoPayload(['folio' => 'PAG-000099', 'tipo_pago' => 'predial_rustico']),
+                ],
+                'meta' => ['current_page' => 1, 'last_page' => 1, 'per_page' => 200, 'total' => 3],
+            ], 200),
+        ]);
+
+        $this->actingAs($this->billingUser())
+            ->get('/receipts/pagos-generales')
+            ->assertInertia(fn ($page) => $page
+                ->component('receipts/pagos-generales')
+                ->has('pagos', 3)
+                ->where('pagos.0.tipo_pago', 'Ingresos')
+                ->where('pagos.1.tipo_pago', 'predial_urbano')
+                ->where('pagos.2.tipo_pago', 'predial_rustico'));
     }
 }
