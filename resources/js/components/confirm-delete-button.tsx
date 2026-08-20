@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 
 export function ConfirmDeleteButton({
@@ -10,18 +11,21 @@ export function ConfirmDeleteButton({
     confirmMessage?: string;
 }) {
     return (
-        <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="text-destructive hover:text-destructive"
-            onClick={() => {
-                if (confirm(confirmMessage)) {
-                    router.delete(href, { preserveScroll: true });
-                }
-            }}
-        >
-            <Trash2 className="size-4" />
-        </Button>
+        <ConfirmDialog
+            trigger={
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive"
+                >
+                    <Trash2 className="size-4" />
+                </Button>
+            }
+            title="Confirmar eliminación"
+            description={confirmMessage}
+            confirmLabel="Eliminar"
+            onConfirm={() => router.delete(href, { preserveScroll: true })}
+        />
     );
 }

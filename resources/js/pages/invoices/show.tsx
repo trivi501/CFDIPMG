@@ -1,5 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { Ban, FileText, FileType } from 'lucide-react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,16 +40,6 @@ const currency = new Intl.NumberFormat('es-MX', {
 
 export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
     const { can } = usePermissions();
-
-    const cancel = () => {
-        if (
-            confirm(
-                '¿Cancelar esta factura ante el SAT? Esta acción no se puede deshacer.',
-            )
-        ) {
-            router.post(invoices.cancel(invoice).url);
-        }
-    };
 
     return (
         <>
@@ -171,9 +162,19 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                             </>
                         )}
                         {can('invoices.cancel') && (
-                            <Button variant="destructive" onClick={cancel}>
-                                <Ban /> Cancelar factura
-                            </Button>
+                            <ConfirmDialog
+                                trigger={
+                                    <Button variant="destructive">
+                                        <Ban /> Cancelar factura
+                                    </Button>
+                                }
+                                title="Cancelar factura"
+                                description="¿Cancelar esta factura ante el SAT? Esta acción no se puede deshacer."
+                                confirmLabel="Cancelar factura"
+                                onConfirm={() =>
+                                    router.post(invoices.cancel(invoice).url)
+                                }
+                            />
                         )}
                     </div>
                 )}
