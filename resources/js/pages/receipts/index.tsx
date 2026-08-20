@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Search } from 'lucide-react';
+import { List, Search } from 'lucide-react';
 import Heading from '@/components/heading';
 import { Pagination } from '@/components/pagination';
 import type { Paginator } from '@/components/pagination';
@@ -17,6 +17,7 @@ import {
 import { usePermissions } from '@/hooks/use-permissions';
 import { dashboard } from '@/routes';
 import receipts from '@/routes/receipts';
+import pagosGenerales from '@/routes/receipts/pagos-generales';
 
 type Receipt = {
     id: number;
@@ -72,11 +73,18 @@ export default function ReceiptsIndex({
                         description="Recibos recibidos del sistema externo, listos para facturar."
                     />
                     {can('receipts.import') && (
-                        <Button asChild>
-                            <Link href={receipts.lookup.create()}>
-                                <Search /> Checar folio para facturar
-                            </Link>
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button variant="outline" asChild>
+                                <Link href={pagosGenerales.index()}>
+                                    <List /> Pagos generales
+                                </Link>
+                            </Button>
+                            <Button asChild>
+                                <Link href={receipts.lookup.create()}>
+                                    <Search /> Checar folio para facturar
+                                </Link>
+                            </Button>
+                        </div>
                     )}
                 </div>
 

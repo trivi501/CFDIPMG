@@ -64,7 +64,7 @@ class ReceiptController extends Controller
 
         $payload = $receipt->customer_payload ?? [];
 
-        $rfc = data_get($payload, 'datos_facturacion.rfc');
+        $rfc = data_get($payload, 'datos_facturacion.rfc_facturacion');
         $customer = null;
 
         if (is_string($rfc) && $rfc !== '' && $rfc !== '—') {

@@ -18,6 +18,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('permission:receipts.view')->group(function () {
         Route::get('receipts', [ReceiptController::class, 'index'])->name('receipts.index');
+        Route::get('receipts/pagos-generales', [ReceiptLookupController::class, 'index'])
+            ->middleware('permission:receipts.import')
+            ->name('receipts.pagos-generales.index');
         Route::get('receipts/lookup', [ReceiptLookupController::class, 'create'])
             ->middleware('permission:receipts.import')
             ->name('receipts.lookup.create');

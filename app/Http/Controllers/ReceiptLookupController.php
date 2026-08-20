@@ -11,9 +11,49 @@ use Inertia\Response;
 
 class ReceiptLookupController extends Controller
 {
+    /**
+     * "Pagos generales" here means the Ingresos category in the external Pagos
+     * system (as opposed to predial_urbano/predial_rustico) — general income
+     * payments that aren't tied to a specific property tax account.
+     */
+    protected const TIPO_PAGO_GENERALES = 'Ingresos';
+
     public function create(): Response
     {
         return Inertia::render('receipts/lookup');
+    }
+
+    public function index(PagosClient $pagos): Response
+    {
+        $result = $pagos->list([
+            'tipo_pago' => self::TIPO_PAGO_GENERALES,
+            'estatus' => 'pagado',
+            'per_page' => 100,
+        ]);
+
+        $pagosList = collect($result['data']);
+
+        $existingReceipts = PaymentReceipt::query()
+            ->where('source_system', PaymentReceipt::SOURCE_PAGOS_MUNICIPALES)
+            ->whereIn('external_id', $pagosList->pluck('folio'))
+            ->get(['external_id', 'status', 'invoice_id'])
+            ->keyBy('external_id');
+
+        return Inertia::render('receipts/pagos-generales', [
+            'pagos' => $pagosList->map(function (array $pago) use ($existingReceipts) {
+                $receipt = $existingReceipts->get($pago['folio']);
+
+                return [
+                    'folio' => $pago['folio'],
+                    'fecha' => $pago['fecha'] ?? null,
+                    'descripcion' => $pago['descripcion'] ?? null,
+                    'monto' => $pago['monto'] ?? 0,
+                    'contribuyente_nombre' => $pago['contribuyente']['nombre'] ?? null,
+                    'receipt_status' => $receipt?->status,
+                    'invoice_id' => $receipt?->invoice_id,
+                ];
+            })->values(),
+        ]);
     }
 
     public function store(Request $request, PagosClient $pagos): RedirectResponse

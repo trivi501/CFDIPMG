@@ -24,4 +24,20 @@ class PagosClient
 
         return $response->throw()->json();
     }
+
+    /**
+     * List payments in the external "Pagos" system, optionally filtered.
+     *
+     * @param  array{tipo_pago?: string, estatus?: string, anio_pago?: string, per_page?: int}  $filters
+     * @return array{data: list<array<string, mixed>>, meta: array<string, mixed>}
+     */
+    public function list(array $filters = []): array
+    {
+        return Http::withToken(config('services.pagos.token'))
+            ->acceptJson()
+            ->baseUrl(config('services.pagos.base_url'))
+            ->get('/api/pagos', $filters)
+            ->throw()
+            ->json();
+    }
 }

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\PaymentReceipt;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -117,5 +119,64 @@ class ReceiptLookupTest extends TestCase
         $this->actingAs($user)->post('/receipts/lookup', ['folio' => 'PAG-000098']);
 
         $this->assertSame(1, PaymentReceipt::count());
+    }
+
+    public function test_a_user_without_receipts_import_permission_cannot_list_pagos_generales(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('Consulta');
+
+        $this->actingAs($user)->get('/receipts/pagos-generales')->assertForbidden();
+    }
+
+    public function test_it_lists_pagos_generales_and_flags_the_ones_already_invoiced(): void
+    {
+        Http::fake([
+            'localhost:8080/api/pagos*' => Http::response([
+                'data' => [
+                    $this->pagoPayload(['folio' => 'CG-000001', 'tipo_pago' => 'Ingresos']),
+                    $this->pagoPayload(['folio' => 'CG-000002', 'tipo_pago' => 'Ingresos']),
+                ],
+                'meta' => ['current_page' => 1, 'last_page' => 1, 'per_page' => 100, 'total' => 2],
+            ], 200),
+        ]);
+
+        $invoice = Invoice::create([
+            'customer_id' => Customer::create([
+                'legal_name' => 'Cliente de Prueba',
+                'rfc' => 'XAXX010101000',
+                'tax_system' => '616',
+                'zip' => '01000',
+            ])->id,
+            'status' => 'valid',
+            'total' => 100,
+            'issued_at' => now(),
+        ]);
+
+        PaymentReceipt::create([
+            'external_id' => 'CG-000001',
+            'source_system' => PaymentReceipt::SOURCE_PAGOS_MUNICIPALES,
+            'customer_payload' => [],
+            'amount' => 100,
+            'currency' => 'MXN',
+            'status' => 'invoiced',
+            'invoice_id' => $invoice->id,
+            'received_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->billingUser())->get('/receipts/pagos-generales');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('receipts/pagos-generales')
+            ->has('pagos', 2)
+            ->where('pagos.0.folio', 'CG-000001')
+            ->where('pagos.0.receipt_status', 'invoiced')
+            ->where('pagos.0.invoice_id', $invoice->id)
+            ->where('pagos.1.folio', 'CG-000002')
+            ->where('pagos.1.receipt_status', null));
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'tipo_pago=Ingresos')
+            && str_contains($request->url(), 'estatus=pagado'));
     }
 }
