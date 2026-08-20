@@ -17,6 +17,7 @@ import {
 import { usePermissions } from '@/hooks/use-permissions';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
+import globalInvoice from '@/routes/invoices/global';
 
 type Invoice = {
     id: number;
@@ -26,6 +27,7 @@ type Invoice = {
     status: 'valid' | 'canceled' | 'failed';
     total: string;
     issued_at: string | null;
+    is_global: boolean;
     customer: { legal_name: string } | null;
 };
 
@@ -70,11 +72,18 @@ export default function InvoicesIndex({
                         description="CFDI generados a partir de los recibos de pago."
                     />
                     {can('invoices.create') && (
-                        <Button asChild>
-                            <Link href={invoices.create()}>
-                                <Plus /> Factura abierta
-                            </Link>
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button variant="outline" asChild>
+                                <Link href={globalInvoice.create()}>
+                                    Factura global
+                                </Link>
+                            </Button>
+                            <Button asChild>
+                                <Link href={invoices.create()}>
+                                    <Plus /> Factura abierta
+                                </Link>
+                            </Button>
+                        </div>
                     )}
                 </div>
 
@@ -139,6 +148,14 @@ export default function InvoicesIndex({
                                             {invoice.customer?.legal_name ??
                                                 '—'}
                                         </Link>
+                                        {invoice.is_global && (
+                                            <Badge
+                                                variant="secondary"
+                                                className="ml-2"
+                                            >
+                                                Global
+                                            </Badge>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         {invoice.series ?? ''}

@@ -3,6 +3,7 @@
 use App\Http\Controllers\ApiClientController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GlobalInvoiceController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReceiptController;
@@ -43,6 +44,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('invoices', [InvoiceController::class, 'store'])
             ->middleware('permission:invoices.create')
             ->name('invoices.store');
+        Route::get('invoices/global', [GlobalInvoiceController::class, 'create'])
+            ->middleware('permission:invoices.create')
+            ->name('invoices.global.create');
+        Route::post('invoices/global', [GlobalInvoiceController::class, 'store'])
+            ->middleware('permission:invoices.create')
+            ->name('invoices.global.store');
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
         Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])
             ->middleware('permission:invoices.download')

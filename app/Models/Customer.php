@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Customer extends Model
 {
+    /**
+     * The generic RFC SAT reserves for "público en general" — used as the
+     * billed-to customer on global invoices.
+     */
+    public const RFC_PUBLICO_GENERAL = 'XAXX010101000';
+
     protected $fillable = [
         'legal_name',
         'rfc',

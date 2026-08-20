@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends Model
 {
@@ -22,6 +22,9 @@ class Invoice extends Model
         'error_message',
         'issued_at',
         'canceled_at',
+        'is_global',
+        'period_month',
+        'period_year',
     ];
 
     protected function casts(): array
@@ -30,6 +33,7 @@ class Invoice extends Model
             'total' => 'decimal:2',
             'issued_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'is_global' => 'boolean',
         ];
     }
 
@@ -50,10 +54,13 @@ class Invoice extends Model
     }
 
     /**
-     * @return HasOne<PaymentReceipt, $this>
+     * All receipts folded into this invoice — plural because a global invoice
+     * (is_global) can cover many; a regular receipt-based invoice has exactly one.
+     *
+     * @return HasMany<PaymentReceipt, $this>
      */
-    public function sourceReceipt(): HasOne
+    public function sourceReceipts(): HasMany
     {
-        return $this->hasOne(PaymentReceipt::class, 'invoice_id');
+        return $this->hasMany(PaymentReceipt::class, 'invoice_id');
     }
 }

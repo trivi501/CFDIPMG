@@ -67,8 +67,8 @@ export default function InvoiceCreate({
         const product = products.find((p) => String(p.id) === productId);
 
         if (!product) {
-return;
-}
+            return;
+        }
 
         updateItem(index, {
             description: product.description,

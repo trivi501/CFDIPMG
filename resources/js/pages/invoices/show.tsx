@@ -19,12 +19,21 @@ type Invoice = {
     issued_at: string | null;
     canceled_at: string | null;
     error_message: string | null;
+    is_global: boolean;
+    period_month: number | null;
+    period_year: number | null;
     customer: { legal_name: string; rfc: string; email: string | null } | null;
-    paymentReceipt: {
+    payment_receipt: {
         external_id: string;
         source_system: string;
         concept: string | null;
     } | null;
+    source_receipts: {
+        id: number;
+        external_id: string;
+        source_system: string;
+        amount: string;
+    }[];
 };
 
 const STATUS_LABELS: Record<Invoice['status'], string> = {
@@ -32,6 +41,21 @@ const STATUS_LABELS: Record<Invoice['status'], string> = {
     canceled: 'Cancelada',
     failed: 'Fallida',
 };
+
+const MONTHS = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+];
 
 const currency = new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -50,17 +74,22 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                         title={`Factura ${invoice.series ?? ''}${invoice.folio ?? ''}`}
                         description={invoice.customer?.legal_name}
                     />
-                    <Badge
-                        variant={
-                            invoice.status === 'valid'
-                                ? 'default'
-                                : invoice.status === 'failed'
-                                  ? 'destructive'
-                                  : 'secondary'
-                        }
-                    >
-                        {STATUS_LABELS[invoice.status]}
-                    </Badge>
+                    <div className="flex gap-2">
+                        {invoice.is_global && (
+                            <Badge variant="secondary">Global</Badge>
+                        )}
+                        <Badge
+                            variant={
+                                invoice.status === 'valid'
+                                    ? 'default'
+                                    : invoice.status === 'failed'
+                                      ? 'destructive'
+                                      : 'secondary'
+                            }
+                        >
+                            {STATUS_LABELS[invoice.status]}
+                        </Badge>
+                    </div>
                 </div>
 
                 <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
@@ -108,21 +137,57 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                         </CardContent>
                     </Card>
 
-                    {invoice.paymentReceipt && (
+                    {invoice.payment_receipt && (
                         <Card className="sm:col-span-2">
                             <CardHeader>
                                 <CardTitle>Recibo de origen</CardTitle>
                             </CardHeader>
                             <CardContent className="text-sm">
                                 <p>
-                                    {invoice.paymentReceipt.source_system} ·{' '}
-                                    {invoice.paymentReceipt.external_id}
+                                    {invoice.payment_receipt.source_system} ·{' '}
+                                    {invoice.payment_receipt.external_id}
                                 </p>
-                                {invoice.paymentReceipt.concept && (
+                                {invoice.payment_receipt.concept && (
                                     <p className="text-muted-foreground">
-                                        {invoice.paymentReceipt.concept}
+                                        {invoice.payment_receipt.concept}
                                     </p>
                                 )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {invoice.is_global && (
+                        <Card className="sm:col-span-2">
+                            <CardHeader>
+                                <CardTitle>
+                                    Periodo:{' '}
+                                    {invoice.period_month
+                                        ? MONTHS[invoice.period_month - 1]
+                                        : '—'}{' '}
+                                    {invoice.period_year} ·{' '}
+                                    {invoice.source_receipts.length} recibos
+                                    incluidos
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <ul className="max-h-64 space-y-1 overflow-y-auto text-sm">
+                                    {invoice.source_receipts.map((receipt) => (
+                                        <li
+                                            key={receipt.id}
+                                            className="flex justify-between gap-2"
+                                        >
+                                            <span className="text-muted-foreground">
+                                                {receipt.source_system} ·{' '}
+                                                {receipt.external_id}
+                                            </span>
+                                            <span>
+                                                {currency.format(
+                                                    Number(receipt.amount),
+                                                )}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
                             </CardContent>
                         </Card>
                     )}
