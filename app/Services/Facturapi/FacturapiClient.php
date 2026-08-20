@@ -39,7 +39,7 @@ class FacturapiClient
     public function cancelInvoice(string $facturapiInvoiceId, string $motive = '02'): Response
     {
         return $this->client()
-            ->delete("/invoices/{$facturapiInvoiceId}", ['motive' => $motive])
+            ->delete("/invoices/{$facturapiInvoiceId}?motive={$motive}")
             ->throw();
     }
 
