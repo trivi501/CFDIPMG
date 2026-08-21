@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\ApiClientController;
+use App\Http\Controllers\ApoyoController;
+use App\Http\Controllers\BeneficiarioController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalInvoiceController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PersonaApoyaController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\ReceiptLookupController;
@@ -72,6 +75,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('products', ProductController::class)
             ->except(['show'])
             ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:products.manage');
+    });
+
+    Route::middleware('permission:apoyos.view')->group(function () {
+        Route::resource('apoyos', ApoyoController::class)
+            ->except(['show'])
+            ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');
+        Route::resource('beneficiarios', BeneficiarioController::class)
+            ->except(['show'])
+            ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');
+        Route::resource('personas-apoya', PersonaApoyaController::class)
+            ->except(['show'])
+            ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');
     });
 
     Route::middleware('permission:users.manage')->group(function () {

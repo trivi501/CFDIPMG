@@ -3,13 +3,16 @@ import {
     BookOpen,
     FileCheck2,
     FolderGit2,
+    HandCoins,
     KeyRound,
     LayoutGrid,
     Package,
     Receipt,
     ShieldCheck,
+    UserCheck,
     UserCog,
     Users,
+    Users2,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -27,8 +30,11 @@ import {
 import { usePermissions } from '@/hooks/use-permissions';
 import { dashboard } from '@/routes';
 import apiClients from '@/routes/api-clients';
+import apoyos from '@/routes/apoyos';
+import beneficiarios from '@/routes/beneficiarios';
 import customers from '@/routes/customers';
 import invoices from '@/routes/invoices';
+import personasApoya from '@/routes/personas-apoya';
 import products from '@/routes/products';
 import receipts from '@/routes/receipts';
 import roles from '@/routes/roles';
@@ -87,6 +93,26 @@ export function AppSidebar() {
         });
     }
 
+    const apoyosNavItems: NavItem[] = [];
+
+    if (can('apoyos.view')) {
+        apoyosNavItems.push({
+            title: 'Apoyo',
+            href: apoyos.index(),
+            icon: HandCoins,
+        });
+        apoyosNavItems.push({
+            title: 'Beneficiarios',
+            href: beneficiarios.index(),
+            icon: Users2,
+        });
+        apoyosNavItems.push({
+            title: 'Personas de apoyo',
+            href: personasApoya.index(),
+            icon: UserCheck,
+        });
+    }
+
     const adminNavItems: NavItem[] = [];
 
     if (can('users.manage')) {
@@ -129,6 +155,7 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <NavMain items={mainNavItems} />
+                <NavMain items={apoyosNavItems} label="Apoyos" />
                 <NavMain items={adminNavItems} label="Administración" />
             </SidebarContent>
 

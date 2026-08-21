@@ -25,6 +25,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'customers.manage',
             'products.view',
             'products.manage',
+            'apoyos.view',
+            'apoyos.manage',
         ],
         'Consulta' => [
             'receipts.view',
@@ -32,6 +34,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'invoices.download',
             'customers.view',
             'products.view',
+            'apoyos.view',
         ],
     ];
 
@@ -49,6 +52,8 @@ class RolesAndPermissionsSeeder extends Seeder
         'customers.manage',
         'products.view',
         'products.manage',
+        'apoyos.view',
+        'apoyos.manage',
         'users.manage',
         'roles.manage',
         'settings.manage',
