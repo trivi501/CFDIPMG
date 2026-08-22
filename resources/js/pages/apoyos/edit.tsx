@@ -45,6 +45,12 @@ type Apoyo = {
     preparado: boolean;
     facturado: boolean;
     solicitud_recibo_path: string | null;
+    curp: string | null;
+    curp_path: string | null;
+    rfc: string | null;
+    rfc_path: string | null;
+    ine_path: string | null;
+    comprobante_domicilio_path: string | null;
     detalles: ApoyoDetalle[];
 };
 
@@ -78,6 +84,12 @@ export default function ApoyoEdit({
         preparado: apoyo.preparado,
         facturado: apoyo.facturado,
         solicitud_recibo: null as File | null,
+        curp: apoyo.curp ?? '',
+        curp_archivo: null as File | null,
+        rfc: apoyo.rfc ?? '',
+        rfc_archivo: null as File | null,
+        ine: null as File | null,
+        comprobante_domicilio: null as File | null,
         detalles: apoyo.detalles.map(toDetalle),
     });
 
@@ -225,6 +237,144 @@ export default function ApoyoEdit({
                                     }
                                 />
                                 <InputError message={errors.solicitud_recibo} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="curp">CURP</Label>
+                                <Input
+                                    id="curp"
+                                    value={data.curp}
+                                    maxLength={18}
+                                    onChange={(e) =>
+                                        setData('curp', e.target.value)
+                                    }
+                                />
+                                <InputError message={errors.curp} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="curp_archivo">
+                                    CURP (archivo)
+                                </Label>
+                                {apoyo.curp_path && (
+                                    <a
+                                        href={`/storage/${apoyo.curp_path}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sm text-primary underline"
+                                    >
+                                        Ver archivo actual
+                                    </a>
+                                )}
+                                <Input
+                                    id="curp_archivo"
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    onChange={(e) =>
+                                        setData(
+                                            'curp_archivo',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                />
+                                <InputError message={errors.curp_archivo} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="rfc">RFC</Label>
+                                <Input
+                                    id="rfc"
+                                    value={data.rfc}
+                                    maxLength={13}
+                                    onChange={(e) =>
+                                        setData('rfc', e.target.value)
+                                    }
+                                />
+                                <InputError message={errors.rfc} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="rfc_archivo">
+                                    RFC (archivo)
+                                </Label>
+                                {apoyo.rfc_path && (
+                                    <a
+                                        href={`/storage/${apoyo.rfc_path}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sm text-primary underline"
+                                    >
+                                        Ver archivo actual
+                                    </a>
+                                )}
+                                <Input
+                                    id="rfc_archivo"
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    onChange={(e) =>
+                                        setData(
+                                            'rfc_archivo',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                />
+                                <InputError message={errors.rfc_archivo} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="ine">INE</Label>
+                                {apoyo.ine_path && (
+                                    <a
+                                        href={`/storage/${apoyo.ine_path}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sm text-primary underline"
+                                    >
+                                        Ver archivo actual
+                                    </a>
+                                )}
+                                <Input
+                                    id="ine"
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    onChange={(e) =>
+                                        setData(
+                                            'ine',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                />
+                                <InputError message={errors.ine} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="comprobante_domicilio">
+                                    Comprobante de domicilio
+                                </Label>
+                                {apoyo.comprobante_domicilio_path && (
+                                    <a
+                                        href={`/storage/${apoyo.comprobante_domicilio_path}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sm text-primary underline"
+                                    >
+                                        Ver archivo actual
+                                    </a>
+                                )}
+                                <Input
+                                    id="comprobante_domicilio"
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    onChange={(e) =>
+                                        setData(
+                                            'comprobante_domicilio',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                />
+                                <InputError
+                                    message={errors.comprobante_domicilio}
+                                />
                             </div>
 
                             <div className="flex items-center gap-2">

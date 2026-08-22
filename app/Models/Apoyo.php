@@ -18,6 +18,12 @@ class Apoyo extends Model
         'preparado',
         'facturado',
         'solicitud_recibo_path',
+        'curp',
+        'curp_path',
+        'rfc',
+        'rfc_path',
+        'ine_path',
+        'comprobante_domicilio_path',
     ];
 
     protected function casts(): array

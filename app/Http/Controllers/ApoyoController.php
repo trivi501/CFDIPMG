@@ -46,10 +46,13 @@ class ApoyoController extends Controller
                 'persona_apoya_id' => $data['persona_apoya_id'],
                 'preparado' => $data['preparado'],
                 'facturado' => $data['facturado'],
+                'curp' => $data['curp'] ?? null,
+                'rfc' => $data['rfc'] ?? null,
                 ...$this->computeTotals($data['detalles']),
                 'solicitud_recibo_path' => $request->hasFile('solicitud_recibo')
                     ? $request->file('solicitud_recibo')->store('apoyos', 'public')
                     : null,
+                ...$this->storedDocumentPaths($request),
             ]);
 
             foreach ($data['detalles'] as $detalle) {
@@ -82,10 +85,13 @@ class ApoyoController extends Controller
                 'persona_apoya_id' => $data['persona_apoya_id'],
                 'preparado' => $data['preparado'],
                 'facturado' => $data['facturado'],
+                'curp' => $data['curp'] ?? null,
+                'rfc' => $data['rfc'] ?? null,
                 ...$this->computeTotals($data['detalles']),
                 'solicitud_recibo_path' => $request->hasFile('solicitud_recibo')
                     ? $request->file('solicitud_recibo')->store('apoyos', 'public')
                     : $apoyo->solicitud_recibo_path,
+                ...$this->storedDocumentPaths($request, $apoyo),
             ]);
 
             $apoyo->detalles()->delete();
@@ -110,6 +116,23 @@ class ApoyoController extends Controller
     }
 
     /**
+     * @return array{curp_path: ?string, rfc_path: ?string, ine_path: ?string, comprobante_domicilio_path: ?string}
+     */
+    protected function storedDocumentPaths(Request $request, ?Apoyo $apoyo = null): array
+    {
+        $store = fn (string $field) => $request->hasFile($field)
+            ? $request->file($field)->store('apoyos', 'public')
+            : null;
+
+        return [
+            'curp_path' => $store('curp_archivo') ?? $apoyo?->curp_path,
+            'rfc_path' => $store('rfc_archivo') ?? $apoyo?->rfc_path,
+            'ine_path' => $store('ine') ?? $apoyo?->ine_path,
+            'comprobante_domicilio_path' => $store('comprobante_domicilio') ?? $apoyo?->comprobante_domicilio_path,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function validated(Request $request): array
@@ -121,6 +144,12 @@ class ApoyoController extends Controller
             'preparado' => ['required', 'boolean'],
             'facturado' => ['required', 'boolean'],
             'solicitud_recibo' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'curp' => ['nullable', 'string', 'max:18'],
+            'curp_archivo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'rfc' => ['nullable', 'string', 'max:13'],
+            'rfc_archivo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'ine' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'comprobante_domicilio' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'detalles' => ['required', 'array', 'min:1'],
             'detalles.*.cantidad' => ['required', 'numeric', 'min:0.01'],
             'detalles.*.articulo' => ['required', 'string', 'max:255'],

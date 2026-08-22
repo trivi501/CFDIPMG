@@ -52,6 +52,12 @@ export default function ApoyoCreate({
         preparado: false as boolean,
         facturado: false as boolean,
         solicitud_recibo: null as File | null,
+        curp: '',
+        curp_archivo: null as File | null,
+        rfc: '',
+        rfc_archivo: null as File | null,
+        ine: null as File | null,
+        comprobante_domicilio: null as File | null,
         detalles: [emptyDetalle()] as Detalle[],
     });
 
@@ -195,6 +201,104 @@ export default function ApoyoCreate({
                                     }
                                 />
                                 <InputError message={errors.solicitud_recibo} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="curp">CURP</Label>
+                                <Input
+                                    id="curp"
+                                    value={data.curp}
+                                    maxLength={18}
+                                    onChange={(e) =>
+                                        setData('curp', e.target.value)
+                                    }
+                                />
+                                <InputError message={errors.curp} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="curp_archivo">
+                                    CURP (archivo)
+                                </Label>
+                                <Input
+                                    id="curp_archivo"
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    onChange={(e) =>
+                                        setData(
+                                            'curp_archivo',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                />
+                                <InputError message={errors.curp_archivo} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="rfc">RFC</Label>
+                                <Input
+                                    id="rfc"
+                                    value={data.rfc}
+                                    maxLength={13}
+                                    onChange={(e) =>
+                                        setData('rfc', e.target.value)
+                                    }
+                                />
+                                <InputError message={errors.rfc} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="rfc_archivo">
+                                    RFC (archivo)
+                                </Label>
+                                <Input
+                                    id="rfc_archivo"
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    onChange={(e) =>
+                                        setData(
+                                            'rfc_archivo',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                />
+                                <InputError message={errors.rfc_archivo} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="ine">INE</Label>
+                                <Input
+                                    id="ine"
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    onChange={(e) =>
+                                        setData(
+                                            'ine',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                />
+                                <InputError message={errors.ine} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="comprobante_domicilio">
+                                    Comprobante de domicilio
+                                </Label>
+                                <Input
+                                    id="comprobante_domicilio"
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    onChange={(e) =>
+                                        setData(
+                                            'comprobante_domicilio',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                />
+                                <InputError
+                                    message={errors.comprobante_domicilio}
+                                />
                             </div>
 
                             <div className="flex items-center gap-2">
