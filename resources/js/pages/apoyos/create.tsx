@@ -1,10 +1,13 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Combobox } from '@/components/ui/combobox';
+import type { ComboboxOption } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -16,8 +19,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { getXsrfToken } from '@/lib/csrf';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
+import beneficiariosRoutes from '@/routes/beneficiarios';
 
 type Beneficiario = { id: number; nombre: string };
 type PersonaApoya = { id: number; nombre: string };
@@ -60,6 +65,40 @@ export default function ApoyoCreate({
         comprobante_domicilio: null as File | null,
         detalles: [emptyDetalle()] as Detalle[],
     });
+
+    const [beneficiarioOptions, setBeneficiarioOptions] = useState<
+        ComboboxOption[]
+    >(
+        beneficiarios.map((beneficiario) => ({
+            value: String(beneficiario.id),
+            label: beneficiario.nombre,
+        })),
+    );
+
+    const createBeneficiario = async (
+        nombre: string,
+    ): Promise<ComboboxOption | null> => {
+        const response = await fetch(beneficiariosRoutes.store().url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-XSRF-TOKEN': getXsrfToken() ?? '',
+            },
+            body: JSON.stringify({ nombre }),
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const created: { id: number; nombre: string } = await response.json();
+        const option = { value: String(created.id), label: created.nombre };
+        setBeneficiarioOptions((options) => [...options, option]);
+
+        return option;
+    };
 
     const updateDetalle = (index: number, patch: Partial<Detalle>) => {
         setData(
@@ -129,29 +168,16 @@ export default function ApoyoCreate({
                                 <Label htmlFor="beneficiario_id">
                                     Beneficiario
                                 </Label>
-                                <NativeSelect
+                                <Combobox
                                     id="beneficiario_id"
+                                    options={beneficiarioOptions}
                                     value={data.beneficiario_id}
-                                    onChange={(e) =>
-                                        setData(
-                                            'beneficiario_id',
-                                            e.target.value,
-                                        )
+                                    onChange={(value) =>
+                                        setData('beneficiario_id', value)
                                     }
-                                    required
-                                >
-                                    <option value="" disabled>
-                                        Selecciona un beneficiario
-                                    </option>
-                                    {beneficiarios.map((beneficiario) => (
-                                        <option
-                                            key={beneficiario.id}
-                                            value={beneficiario.id}
-                                        >
-                                            {beneficiario.nombre}
-                                        </option>
-                                    ))}
-                                </NativeSelect>
+                                    onCreate={createBeneficiario}
+                                    placeholder="Busca o crea un beneficiario"
+                                />
                                 <InputError message={errors.beneficiario_id} />
                             </div>
 

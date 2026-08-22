@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Beneficiario;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -29,13 +30,17 @@ class BeneficiarioController extends Controller
         return Inertia::render('beneficiarios/create');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $data = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
         ]);
 
-        Beneficiario::create($data);
+        $beneficiario = Beneficiario::create($data);
+
+        if ($request->wantsJson()) {
+            return response()->json($beneficiario);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Beneficiario creado.']);
 
