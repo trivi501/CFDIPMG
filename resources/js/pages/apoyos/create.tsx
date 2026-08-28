@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -23,11 +23,29 @@ import { getXsrfToken } from '@/lib/csrf';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
 import beneficiariosRoutes from '@/routes/beneficiarios';
+import facturasCompra from '@/routes/facturas-compra';
 
 type Beneficiario = { id: number; nombre: string };
 type PersonaApoya = { id: number; nombre: string };
 
+type ArticuloDisponible = {
+    id: number;
+    descripcion: string;
+    cantidad_total: string;
+    costo_unidad: string;
+    iva: string;
+    cantidad_disponible: string;
+};
+
+type FacturaDisponible = {
+    id: number;
+    emisor: string | null;
+    fecha: string | null;
+    articulos: ArticuloDisponible[];
+};
+
 type Detalle = {
+    articulo_factura_compra_id: number | null;
     cantidad: string;
     articulo: string;
     costo_unidad: string;
@@ -35,7 +53,13 @@ type Detalle = {
 };
 
 function emptyDetalle(): Detalle {
-    return { cantidad: '1', articulo: '', costo_unidad: '', iva: '0' };
+    return {
+        articulo_factura_compra_id: null,
+        cantidad: '1',
+        articulo: '',
+        costo_unidad: '',
+        iva: '0',
+    };
 }
 
 const currency = new Intl.NumberFormat('es-MX', {
@@ -46,9 +70,11 @@ const currency = new Intl.NumberFormat('es-MX', {
 export default function ApoyoCreate({
     beneficiarios,
     personasApoya,
+    facturasDisponibles: initialFacturasDisponibles,
 }: {
     beneficiarios: Beneficiario[];
     personasApoya: PersonaApoya[];
+    facturasDisponibles: FacturaDisponible[];
 }) {
     const { data, setData, post, processing, errors } = useForm({
         fecha: new Date().toISOString().slice(0, 10),
@@ -100,6 +126,123 @@ export default function ApoyoCreate({
         return option;
     };
 
+    const [facturasDisponibles, setFacturasDisponibles] = useState<
+        FacturaDisponible[]
+    >(initialFacturasDisponibles);
+    const [selectedFacturaId, setSelectedFacturaId] = useState('');
+    const [selectedArticuloId, setSelectedArticuloId] = useState('');
+    const [cantidadAOtorgar, setCantidadAOtorgar] = useState('1');
+    const [facturaFile, setFacturaFile] = useState<File | null>(null);
+    const [uploadingFactura, setUploadingFactura] = useState(false);
+    const [facturaError, setFacturaError] = useState<string | null>(null);
+
+    const selectedFactura = facturasDisponibles.find(
+        (factura) => String(factura.id) === selectedFacturaId,
+    );
+    const articulosDeFactura = selectedFactura?.articulos ?? [];
+    const selectedArticulo = articulosDeFactura.find(
+        (articulo) => String(articulo.id) === selectedArticuloId,
+    );
+
+    const uploadFactura = async () => {
+        if (!facturaFile) {
+            return;
+        }
+
+        setUploadingFactura(true);
+        setFacturaError(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('xml', facturaFile);
+
+            const response = await fetch(facturasCompra.store().url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-XSRF-TOKEN': getXsrfToken() ?? '',
+                },
+                body: formData,
+            });
+
+            const result: {
+                facturaCompra?: FacturaDisponible;
+                message?: string;
+            } = await response.json();
+
+            if (!response.ok || !result.facturaCompra) {
+                setFacturaError(result.message ?? 'No se pudo leer el XML.');
+
+                return;
+            }
+
+            setFacturasDisponibles((current) => [
+                result.facturaCompra!,
+                ...current,
+            ]);
+            setSelectedFacturaId(String(result.facturaCompra.id));
+            setSelectedArticuloId('');
+            setFacturaFile(null);
+        } catch {
+            setFacturaError('No se pudo leer el XML.');
+        } finally {
+            setUploadingFactura(false);
+        }
+    };
+
+    const addDetalleDesdeArticulo = () => {
+        if (!selectedArticulo) {
+            return;
+        }
+
+        const cantidad = Number(cantidadAOtorgar) || 0;
+        const disponible = Number(selectedArticulo.cantidad_disponible);
+
+        if (cantidad <= 0 || cantidad > disponible) {
+            return;
+        }
+
+        const cantidadTotal = Number(selectedArticulo.cantidad_total) || 1;
+        const ivaPorUnidad = Number(selectedArticulo.iva) / cantidadTotal;
+        const iva = Math.round(ivaPorUnidad * cantidad * 100) / 100;
+
+        setData('detalles', [
+            ...data.detalles,
+            {
+                articulo_factura_compra_id: selectedArticulo.id,
+                articulo: selectedArticulo.descripcion,
+                cantidad: String(cantidad),
+                costo_unidad: selectedArticulo.costo_unidad,
+                iva: String(iva),
+            },
+        ]);
+
+        setFacturasDisponibles((current) =>
+            current.map((factura) =>
+                factura.id === selectedFactura?.id
+                    ? {
+                          ...factura,
+                          articulos: factura.articulos.map((articulo) =>
+                              articulo.id === selectedArticulo.id
+                                  ? {
+                                        ...articulo,
+                                        cantidad_disponible: String(
+                                            Number(
+                                                articulo.cantidad_disponible,
+                                            ) - cantidad,
+                                        ),
+                                    }
+                                  : articulo,
+                          ),
+                      }
+                    : factura,
+            ),
+        );
+        setSelectedArticuloId('');
+        setCantidadAOtorgar('1');
+    };
+
     const updateDetalle = (index: number, patch: Partial<Detalle>) => {
         setData(
             'detalles',
@@ -112,11 +255,36 @@ export default function ApoyoCreate({
     const addDetalle = () =>
         setData('detalles', [...data.detalles, emptyDetalle()]);
 
-    const removeDetalle = (index: number) =>
+    const removeDetalle = (index: number) => {
+        const detalle = data.detalles[index];
+
+        if (detalle.articulo_factura_compra_id !== null) {
+            const cantidad = Number(detalle.cantidad) || 0;
+            const articuloId = detalle.articulo_factura_compra_id;
+
+            setFacturasDisponibles((current) =>
+                current.map((factura) => ({
+                    ...factura,
+                    articulos: factura.articulos.map((articulo) =>
+                        articulo.id === articuloId
+                            ? {
+                                  ...articulo,
+                                  cantidad_disponible: String(
+                                      Number(articulo.cantidad_disponible) +
+                                          cantidad,
+                                  ),
+                              }
+                            : articulo,
+                    ),
+                })),
+            );
+        }
+
         setData(
             'detalles',
             data.detalles.filter((_, i) => i !== index),
         );
+    };
 
     const subTotal = data.detalles.reduce(
         (sum, d) =>
@@ -143,13 +311,13 @@ export default function ApoyoCreate({
                 <form
                     onSubmit={submit}
                     encType="multipart/form-data"
-                    className="max-w-3xl space-y-6"
+                    className="w-full space-y-6"
                 >
                     <Card>
                         <CardHeader>
                             <CardTitle>Datos del apoyo</CardTitle>
                         </CardHeader>
-                        <CardContent className="grid gap-4 sm:grid-cols-2">
+                        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="fecha">Fecha</Label>
                                 <Input
@@ -362,6 +530,140 @@ export default function ApoyoCreate({
                     </Card>
 
                     <Card>
+                        <CardHeader>
+                            <CardTitle>
+                                Artículos de facturas de compra
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex flex-wrap items-end gap-4 rounded-lg border p-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="factura_xml">
+                                        Registrar nueva factura (XML)
+                                    </Label>
+                                    <Input
+                                        id="factura_xml"
+                                        type="file"
+                                        accept=".xml,text/xml,application/xml"
+                                        onChange={(e) =>
+                                            setFacturaFile(
+                                                e.target.files?.[0] ?? null,
+                                            )
+                                        }
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={!facturaFile || uploadingFactura}
+                                    onClick={uploadFactura}
+                                >
+                                    <Upload />{' '}
+                                    {uploadingFactura
+                                        ? 'Leyendo…'
+                                        : 'Registrar'}
+                                </Button>
+                                {facturaError && (
+                                    <p className="text-sm text-destructive">
+                                        {facturaError}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="flex flex-wrap items-end gap-4">
+                                <div className="grid min-w-64 gap-2">
+                                    <Label htmlFor="factura_disponible">
+                                        Factura
+                                    </Label>
+                                    <NativeSelect
+                                        id="factura_disponible"
+                                        value={selectedFacturaId}
+                                        onChange={(e) => {
+                                            setSelectedFacturaId(
+                                                e.target.value,
+                                            );
+                                            setSelectedArticuloId('');
+                                        }}
+                                    >
+                                        <option value="">
+                                            Selecciona una factura
+                                        </option>
+                                        {facturasDisponibles.map((factura) => (
+                                            <option
+                                                key={factura.id}
+                                                value={factura.id}
+                                            >
+                                                {factura.emisor ??
+                                                    'Factura de compra'}
+                                                {factura.fecha
+                                                    ? ` · ${factura.fecha.slice(0, 10)}`
+                                                    : ''}
+                                            </option>
+                                        ))}
+                                    </NativeSelect>
+                                </div>
+                                <div className="grid min-w-64 gap-2">
+                                    <Label htmlFor="articulo_disponible">
+                                        Artículo disponible
+                                    </Label>
+                                    <NativeSelect
+                                        id="articulo_disponible"
+                                        value={selectedArticuloId}
+                                        disabled={!selectedFactura}
+                                        onChange={(e) =>
+                                            setSelectedArticuloId(
+                                                e.target.value,
+                                            )
+                                        }
+                                    >
+                                        <option value="">
+                                            {selectedFactura
+                                                ? 'Selecciona un artículo'
+                                                : 'Primero selecciona una factura'}
+                                        </option>
+                                        {articulosDeFactura.map((articulo) => (
+                                            <option
+                                                key={articulo.id}
+                                                value={articulo.id}
+                                            >
+                                                {articulo.descripcion} ·
+                                                disponible{' '}
+                                                {articulo.cantidad_disponible}
+                                            </option>
+                                        ))}
+                                    </NativeSelect>
+                                </div>
+                                <div className="grid w-32 gap-2">
+                                    <Label htmlFor="cantidad_a_otorgar">
+                                        Cantidad
+                                    </Label>
+                                    <Input
+                                        id="cantidad_a_otorgar"
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        max={
+                                            selectedArticulo?.cantidad_disponible
+                                        }
+                                        value={cantidadAOtorgar}
+                                        onChange={(e) =>
+                                            setCantidadAOtorgar(e.target.value)
+                                        }
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={!selectedArticulo}
+                                    onClick={addDetalleDesdeArticulo}
+                                >
+                                    <Plus /> Agregar al detalle
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
                         <CardHeader className="flex-row items-center justify-between">
                             <CardTitle>Detalle Apoyos</CardTitle>
                             <Button
@@ -518,6 +820,7 @@ export default function ApoyoCreate({
                                     </TableBody>
                                 </Table>
                             </div>
+                            <InputError message={errors.detalles} />
 
                             <div className="text-right text-sm">
                                 <p className="text-muted-foreground">

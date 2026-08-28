@@ -9,6 +9,7 @@ class DetalleApoyo extends Model
 {
     protected $fillable = [
         'apoyo_id',
+        'articulo_factura_compra_id',
         'cantidad',
         'articulo',
         'costo_unidad',
@@ -34,5 +35,13 @@ class DetalleApoyo extends Model
     public function apoyo(): BelongsTo
     {
         return $this->belongsTo(Apoyo::class);
+    }
+
+    /**
+     * @return BelongsTo<ArticuloFacturaCompra, $this>
+     */
+    public function articuloFacturaCompra(): BelongsTo
+    {
+        return $this->belongsTo(ArticuloFacturaCompra::class);
     }
 }

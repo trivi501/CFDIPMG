@@ -3,11 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Apoyo;
+use App\Models\ArticuloFacturaCompra;
 use App\Models\Beneficiario;
+use App\Models\DetalleApoyo;
+use App\Models\FacturaCompra;
 use App\Models\PersonaApoya;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,6 +37,7 @@ class ApoyoController extends Controller
         return Inertia::render('apoyos/create', [
             'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre']),
             'personasApoya' => PersonaApoya::orderBy('nombre')->get(['id', 'nombre']),
+            'facturasDisponibles' => $this->facturasDisponibles(),
         ]);
     }
 
@@ -40,6 +46,8 @@ class ApoyoController extends Controller
         $data = $this->validated($request);
 
         DB::transaction(function () use ($data, $request) {
+            $this->reserveStock($data['detalles']);
+
             $apoyo = Apoyo::create([
                 'fecha' => $data['fecha'],
                 'beneficiario_id' => $data['beneficiario_id'],
@@ -67,10 +75,13 @@ class ApoyoController extends Controller
 
     public function edit(Apoyo $apoyo): Response
     {
+        $apoyo->load('detalles');
+
         return Inertia::render('apoyos/edit', [
-            'apoyo' => $apoyo->load('detalles'),
+            'apoyo' => $apoyo,
             'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre']),
             'personasApoya' => PersonaApoya::orderBy('nombre')->get(['id', 'nombre']),
+            'facturasDisponibles' => $this->facturasDisponibles(),
         ]);
     }
 
@@ -79,6 +90,11 @@ class ApoyoController extends Controller
         $data = $this->validated($request);
 
         DB::transaction(function () use ($data, $request, $apoyo) {
+            $this->releaseStock($apoyo->detalles);
+            $apoyo->detalles()->delete();
+
+            $this->reserveStock($data['detalles']);
+
             $apoyo->update([
                 'fecha' => $data['fecha'],
                 'beneficiario_id' => $data['beneficiario_id'],
@@ -94,8 +110,6 @@ class ApoyoController extends Controller
                 ...$this->storedDocumentPaths($request, $apoyo),
             ]);
 
-            $apoyo->detalles()->delete();
-
             foreach ($data['detalles'] as $detalle) {
                 $apoyo->detalles()->create($this->lineWithTotals($detalle));
             }
@@ -108,7 +122,10 @@ class ApoyoController extends Controller
 
     public function destroy(Apoyo $apoyo): RedirectResponse
     {
-        $apoyo->delete();
+        DB::transaction(function () use ($apoyo) {
+            $this->releaseStock($apoyo->detalles);
+            $apoyo->delete();
+        });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Apoyo eliminado.']);
 
@@ -116,13 +133,75 @@ class ApoyoController extends Controller
     }
 
     /**
+     * @return Collection<int, FacturaCompra>
+     */
+    protected function facturasDisponibles(): Collection
+    {
+        return FacturaCompra::with(['articulos' => fn ($query) => $query->orderBy('descripcion')])
+            ->latest('fecha')
+            ->get();
+    }
+
+    /**
+     * Locks and decrements the available stock for each detalle line that references
+     * an articulo_factura_compra, throwing a validation error if there isn't enough left.
+     *
+     * @param  list<array<string, mixed>>  $detalles
+     */
+    protected function reserveStock(array $detalles): void
+    {
+        foreach ($detalles as $detalle) {
+            $articuloId = $detalle['articulo_factura_compra_id'] ?? null;
+
+            if ($articuloId === null) {
+                continue;
+            }
+
+            $articulo = ArticuloFacturaCompra::whereKey($articuloId)->lockForUpdate()->firstOrFail();
+            $cantidad = (float) $detalle['cantidad'];
+
+            if ($cantidad > (float) $articulo->cantidad_disponible) {
+                throw ValidationException::withMessages([
+                    'detalles' => "Solo quedan {$articulo->cantidad_disponible} disponibles de \"{$articulo->descripcion}\".",
+                ]);
+            }
+
+            $articulo->decrement('cantidad_disponible', $cantidad);
+        }
+    }
+
+    /**
+     * Restores the available stock reserved by the given detalle rows.
+     *
+     * @param  Collection<int, DetalleApoyo>  $detalles
+     */
+    protected function releaseStock(Collection $detalles): void
+    {
+        foreach ($detalles as $detalle) {
+            if ($detalle->articulo_factura_compra_id === null) {
+                continue;
+            }
+
+            ArticuloFacturaCompra::whereKey($detalle->articulo_factura_compra_id)
+                ->lockForUpdate()
+                ->increment('cantidad_disponible', (float) $detalle->cantidad);
+        }
+    }
+
+    /**
      * @return array{curp_path: ?string, rfc_path: ?string, ine_path: ?string, comprobante_domicilio_path: ?string}
      */
     protected function storedDocumentPaths(Request $request, ?Apoyo $apoyo = null): array
     {
-        $store = fn (string $field) => $request->hasFile($field)
-            ? $request->file($field)->store('apoyos', 'public')
-            : null;
+        $store = function (string $field) use ($request): ?string {
+            if (! $request->hasFile($field)) {
+                return null;
+            }
+
+            $path = $request->file($field)->store('apoyos', 'public');
+
+            return $path === false ? null : $path;
+        };
 
         return [
             'curp_path' => $store('curp_archivo') ?? $apoyo?->curp_path,
@@ -151,6 +230,7 @@ class ApoyoController extends Controller
             'ine' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'comprobante_domicilio' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'detalles' => ['required', 'array', 'min:1'],
+            'detalles.*.articulo_factura_compra_id' => ['nullable', 'integer', 'exists:articulos_factura_compra,id'],
             'detalles.*.cantidad' => ['required', 'numeric', 'min:0.01'],
             'detalles.*.articulo' => ['required', 'string', 'max:255'],
             'detalles.*.costo_unidad' => ['required', 'numeric', 'min:0'],
@@ -159,7 +239,7 @@ class ApoyoController extends Controller
     }
 
     /**
-     * @param  array{cantidad: float, articulo: string, costo_unidad: float, iva?: float|null}  $detalle
+     * @param  array{articulo_factura_compra_id?: int|null, cantidad: float, articulo: string, costo_unidad: float, iva?: float|null}  $detalle
      * @return array<string, mixed>
      */
     protected function lineWithTotals(array $detalle): array
@@ -168,6 +248,7 @@ class ApoyoController extends Controller
         $iva = round($detalle['iva'] ?? 0, 2);
 
         return [
+            'articulo_factura_compra_id' => $detalle['articulo_factura_compra_id'] ?? null,
             'cantidad' => $detalle['cantidad'],
             'articulo' => $detalle['articulo'],
             'costo_unidad' => $detalle['costo_unidad'],

@@ -5,6 +5,7 @@ use App\Http\Controllers\ApoyoController;
 use App\Http\Controllers\BeneficiarioController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FacturaCompraController;
 use App\Http\Controllers\GlobalInvoiceController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PersonaApoyaController;
@@ -78,6 +79,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('permission:apoyos.view')->group(function () {
+        Route::get('facturas-compra', [FacturaCompraController::class, 'index'])->name('facturas-compra.index');
+        Route::post('facturas-compra', [FacturaCompraController::class, 'store'])
+            ->middleware('permission:apoyos.manage')
+            ->name('facturas-compra.store');
         Route::resource('apoyos', ApoyoController::class)
             ->except(['show'])
             ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');

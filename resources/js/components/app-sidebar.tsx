@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import {
     BookOpen,
     FileCheck2,
+    FileText,
     FolderGit2,
     HandCoins,
     KeyRound,
@@ -33,6 +34,7 @@ import apiClients from '@/routes/api-clients';
 import apoyos from '@/routes/apoyos';
 import beneficiarios from '@/routes/beneficiarios';
 import customers from '@/routes/customers';
+import facturasCompra from '@/routes/facturas-compra';
 import invoices from '@/routes/invoices';
 import personasApoya from '@/routes/personas-apoya';
 import products from '@/routes/products';
@@ -110,6 +112,11 @@ export function AppSidebar() {
             title: 'Personas de apoyo',
             href: personasApoya.index(),
             icon: UserCheck,
+        });
+        apoyosNavItems.push({
+            title: 'Facturas de compra',
+            href: facturasCompra.index(),
+            icon: FileText,
         });
     }
 
