@@ -1,9 +1,12 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Upload } from 'lucide-react';
+import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
+import type { ComboboxOption } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -60,6 +63,19 @@ export default function FacturasCompraIndex({
         });
     };
 
+    const [selectedFacturaId, setSelectedFacturaId] = useState('');
+
+    const facturaOptions: ComboboxOption[] = facturas.map((factura) => ({
+        value: String(factura.id),
+        label:
+            (factura.emisor ?? 'Factura de compra') +
+            (factura.fecha ? ` · ${factura.fecha}` : ''),
+    }));
+
+    const facturasAMostrar = selectedFacturaId
+        ? facturas.filter((factura) => String(factura.id) === selectedFacturaId)
+        : facturas;
+
     return (
         <>
             <Head title="Facturas de compra" />
@@ -109,7 +125,33 @@ export default function FacturasCompraIndex({
                     </p>
                 )}
 
-                {facturas.map((factura) => (
+                {facturas.length > 0 && (
+                    <div className="flex max-w-sm items-end gap-2">
+                        <div className="grid flex-1 gap-2">
+                            <Label htmlFor="buscar_factura">
+                                Buscar factura
+                            </Label>
+                            <Combobox
+                                id="buscar_factura"
+                                options={facturaOptions}
+                                value={selectedFacturaId}
+                                onChange={setSelectedFacturaId}
+                                placeholder="Busca por proveedor o fecha"
+                            />
+                        </div>
+                        {selectedFacturaId && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setSelectedFacturaId('')}
+                            >
+                                Ver todas
+                            </Button>
+                        )}
+                    </div>
+                )}
+
+                {facturasAMostrar.map((factura) => (
                     <Card key={factura.id}>
                         <CardHeader className="flex-row items-center justify-between">
                             <CardTitle>

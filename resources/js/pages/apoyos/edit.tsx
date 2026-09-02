@@ -168,6 +168,14 @@ export default function ApoyoEdit({
         (factura) => String(factura.id) === selectedFacturaId,
     );
     const articulosDeFactura = selectedFactura?.articulos ?? [];
+    const facturaOptions: ComboboxOption[] = facturasDisponibles.map(
+        (factura) => ({
+            value: String(factura.id),
+            label:
+                (factura.emisor ?? 'Factura de compra') +
+                (factura.fecha ? ` · ${factura.fecha.slice(0, 10)}` : ''),
+        }),
+    );
     const selectedArticulo = articulosDeFactura.find(
         (articulo) => String(articulo.id) === selectedArticuloId,
     );
@@ -656,32 +664,16 @@ export default function ApoyoEdit({
                                     <Label htmlFor="factura_disponible">
                                         Factura
                                     </Label>
-                                    <NativeSelect
+                                    <Combobox
                                         id="factura_disponible"
+                                        options={facturaOptions}
                                         value={selectedFacturaId}
-                                        onChange={(e) => {
-                                            setSelectedFacturaId(
-                                                e.target.value,
-                                            );
+                                        onChange={(value) => {
+                                            setSelectedFacturaId(value);
                                             setSelectedArticuloId('');
                                         }}
-                                    >
-                                        <option value="">
-                                            Selecciona una factura
-                                        </option>
-                                        {facturasDisponibles.map((factura) => (
-                                            <option
-                                                key={factura.id}
-                                                value={factura.id}
-                                            >
-                                                {factura.emisor ??
-                                                    'Factura de compra'}
-                                                {factura.fecha
-                                                    ? ` · ${factura.fecha.slice(0, 10)}`
-                                                    : ''}
-                                            </option>
-                                        ))}
-                                    </NativeSelect>
+                                        placeholder="Busca una factura"
+                                    />
                                 </div>
                                 <div className="grid min-w-64 gap-2">
                                     <Label htmlFor="articulo_disponible">
