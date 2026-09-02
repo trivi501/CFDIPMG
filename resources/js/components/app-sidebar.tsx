@@ -1,9 +1,7 @@
 import { Link } from '@inertiajs/react';
 import {
-    BookOpen,
     FileCheck2,
     FileText,
-    FolderGit2,
     HandCoins,
     KeyRound,
     LayoutGrid,
@@ -16,7 +14,6 @@ import {
     Users2,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
-import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -42,19 +39,6 @@ import receipts from '@/routes/receipts';
 import roles from '@/routes/roles';
 import users from '@/routes/users';
 import type { NavItem } from '@/types';
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
 
 export function AppSidebar() {
     const { can } = usePermissions();
@@ -167,7 +151,6 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
