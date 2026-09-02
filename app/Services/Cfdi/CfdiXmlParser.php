@@ -72,11 +72,13 @@ class CfdiXmlParser
             ];
         }
 
-        $emisorNode = $xpath->query('//cfdi:Emisor')?->item(0);
+        $emisorNodes = $xpath->query('//cfdi:Emisor');
+        $emisorNode = $emisorNodes !== false ? $emisorNodes->item(0) : null;
         $emisor = $emisorNode instanceof DOMElement ? $emisorNode->getAttribute('Nombre') : '';
         $fecha = $comprobante->getAttribute('Fecha');
 
-        $timbreNode = $xpath->query('//tfd:TimbreFiscalDigital')?->item(0);
+        $timbreNodes = $xpath->query('//tfd:TimbreFiscalDigital');
+        $timbreNode = $timbreNodes !== false ? $timbreNodes->item(0) : null;
         $uuid = $timbreNode instanceof DOMElement ? $timbreNode->getAttribute('UUID') : '';
 
         return [

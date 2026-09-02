@@ -43,12 +43,18 @@ class FacturaCompraController extends Controller
 
         $hash = hash('sha256', $contents);
 
-        $duplicate = FacturaCompra::where('xml_hash', $hash)
-            ->when($parsed['uuid'] !== null, fn ($query) => $query->orWhere('uuid', $parsed['uuid']))
-            ->first();
+        $duplicateQuery = FacturaCompra::where('xml_hash', $hash);
+
+        if ($parsed['uuid'] !== null) {
+            $duplicateQuery->orWhere('uuid', $parsed['uuid']);
+        }
+
+        $duplicate = $duplicateQuery->first();
 
         if ($duplicate !== null) {
-            return $this->uploadError($request, "Esta factura ya fue registrada ({$duplicate->emisor}, {$duplicate->fecha?->format('d/m/Y')}).");
+            $fecha = $duplicate->fecha !== null ? Carbon::parse($duplicate->fecha)->format('d/m/Y') : 'sin fecha';
+
+            return $this->uploadError($request, "Esta factura ya fue registrada ({$duplicate->emisor}, {$fecha}).");
         }
 
         $path = $request->file('xml')->store('facturas-compra', 'public');
