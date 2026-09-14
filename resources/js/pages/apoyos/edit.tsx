@@ -3,9 +3,9 @@ import { Plus, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Combobox } from '@/components/ui/combobox';
 import type { ComboboxOption } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
@@ -66,8 +66,7 @@ type Apoyo = {
     fecha: string;
     beneficiario_id: number;
     persona_apoya_id: number;
-    preparado: boolean;
-    facturado: boolean;
+    estatus: 'preparado' | 'aprobado' | 'facturado' | 'rechazado';
     solicitud_recibo_path: string | null;
     curp: string | null;
     curp_path: string | null;
@@ -93,6 +92,23 @@ const currency = new Intl.NumberFormat('es-MX', {
     currency: 'MXN',
 });
 
+const estatusLabels: Record<Apoyo['estatus'], string> = {
+    preparado: 'Preparado',
+    aprobado: 'Aprobado',
+    facturado: 'Facturado',
+    rechazado: 'Rechazado',
+};
+
+const estatusVariants: Record<
+    Apoyo['estatus'],
+    'outline' | 'secondary' | 'default' | 'destructive'
+> = {
+    preparado: 'outline',
+    aprobado: 'secondary',
+    facturado: 'default',
+    rechazado: 'destructive',
+};
+
 export default function ApoyoEdit({
     apoyo,
     beneficiarios,
@@ -108,8 +124,6 @@ export default function ApoyoEdit({
         fecha: apoyo.fecha,
         beneficiario_id: String(apoyo.beneficiario_id),
         persona_apoya_id: String(apoyo.persona_apoya_id),
-        preparado: apoyo.preparado,
-        facturado: apoyo.facturado,
         solicitud_recibo: null as File | null,
         curp: apoyo.curp ?? '',
         curp_archivo: null as File | null,
@@ -584,36 +598,21 @@ export default function ApoyoEdit({
                                 />
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="preparado"
-                                    checked={data.preparado}
-                                    onCheckedChange={(checked) =>
-                                        setData('preparado', checked === true)
-                                    }
-                                />
-                                <Label
-                                    htmlFor="preparado"
-                                    className="font-normal"
-                                >
-                                    Preparado
-                                </Label>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="facturado"
-                                    checked={data.facturado}
-                                    onCheckedChange={(checked) =>
-                                        setData('facturado', checked === true)
-                                    }
-                                />
-                                <Label
-                                    htmlFor="facturado"
-                                    className="font-normal"
-                                >
-                                    Facturado
-                                </Label>
+                            <div className="grid gap-2">
+                                <Label>Estatus</Label>
+                                <div>
+                                    <Badge
+                                        variant={
+                                            estatusVariants[apoyo.estatus]
+                                        }
+                                    >
+                                        {estatusLabels[apoyo.estatus]}
+                                    </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                    Aprobar y facturar se hacen desde el
+                                    listado de apoyos.
+                                </p>
                             </div>
                         </CardContent>
                     </Card>

@@ -5,30 +5,38 @@ namespace App\Http\Controllers;
 use App\Models\Apoyo;
 use App\Models\ArticuloFacturaCompra;
 use App\Models\Beneficiario;
+use App\Models\Customer;
 use App\Models\DetalleApoyo;
 use App\Models\FacturaCompra;
 use App\Models\PersonaApoya;
+use App\Services\InvoiceService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use ZipArchive;
 
 class ApoyoController extends Controller
 {
     public function index(Request $request): Response
     {
-        $apoyos = Apoyo::with('beneficiario', 'personaApoya')
-            ->when($request->filled('facturado'), fn ($query) => $query->where('facturado', $request->boolean('facturado')))
+        $apoyos = $this->visibleApoyos($request)
+            ->with('beneficiario', 'personaApoya')
+            ->when($request->filled('estatus'), fn (Builder $query) => $query->where('estatus', $request->string('estatus')))
             ->latest('fecha')
             ->paginate(15)
             ->withQueryString();
 
         return Inertia::render('apoyos/index', [
             'apoyos' => $apoyos,
-            'filters' => $request->only('facturado'),
+            'filters' => $request->only('estatus'),
         ]);
     }
 
@@ -52,8 +60,8 @@ class ApoyoController extends Controller
                 'fecha' => $data['fecha'],
                 'beneficiario_id' => $data['beneficiario_id'],
                 'persona_apoya_id' => $data['persona_apoya_id'],
-                'preparado' => $data['preparado'],
-                'facturado' => $data['facturado'],
+                'user_id' => $request->user()->id,
+                'estatus' => Apoyo::ESTATUS_PREPARADO,
                 'curp' => $data['curp'] ?? null,
                 'rfc' => $data['rfc'] ?? null,
                 ...$this->computeTotals($data['detalles']),
@@ -73,8 +81,21 @@ class ApoyoController extends Controller
         return to_route('apoyos.index');
     }
 
-    public function edit(Apoyo $apoyo): Response
+    public function show(Request $request, Apoyo $apoyo): Response
     {
+        $this->authorizeAccess($request, $apoyo);
+
+        $apoyo->load('detalles', 'beneficiario', 'personaApoya', 'user', 'invoice');
+
+        return Inertia::render('apoyos/show', [
+            'apoyo' => $apoyo,
+        ]);
+    }
+
+    public function edit(Request $request, Apoyo $apoyo): Response
+    {
+        $this->authorizeAccess($request, $apoyo);
+
         $apoyo->load('detalles');
 
         return Inertia::render('apoyos/edit', [
@@ -87,6 +108,8 @@ class ApoyoController extends Controller
 
     public function update(Request $request, Apoyo $apoyo): RedirectResponse
     {
+        $this->authorizeAccess($request, $apoyo);
+
         $data = $this->validated($request);
 
         DB::transaction(function () use ($data, $request, $apoyo) {
@@ -99,8 +122,6 @@ class ApoyoController extends Controller
                 'fecha' => $data['fecha'],
                 'beneficiario_id' => $data['beneficiario_id'],
                 'persona_apoya_id' => $data['persona_apoya_id'],
-                'preparado' => $data['preparado'],
-                'facturado' => $data['facturado'],
                 'curp' => $data['curp'] ?? null,
                 'rfc' => $data['rfc'] ?? null,
                 ...$this->computeTotals($data['detalles']),
@@ -120,8 +141,10 @@ class ApoyoController extends Controller
         return to_route('apoyos.index');
     }
 
-    public function destroy(Apoyo $apoyo): RedirectResponse
+    public function destroy(Request $request, Apoyo $apoyo): RedirectResponse
     {
+        $this->authorizeAccess($request, $apoyo);
+
         DB::transaction(function () use ($apoyo) {
             $this->releaseStock($apoyo->detalles);
             $apoyo->delete();
@@ -130,6 +153,220 @@ class ApoyoController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Apoyo eliminado.']);
 
         return to_route('apoyos.index');
+    }
+
+    public function aprobar(Request $request, Apoyo $apoyo): RedirectResponse
+    {
+        if ($apoyo->estatus !== Apoyo::ESTATUS_PREPARADO) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Solo un apoyo preparado se puede aprobar.']);
+
+            return back();
+        }
+
+        $apoyo->update(['estatus' => Apoyo::ESTATUS_APROBADO]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Apoyo aprobado.']);
+
+        return back();
+    }
+
+    public function rechazar(Request $request, Apoyo $apoyo): RedirectResponse
+    {
+        if ($apoyo->estatus !== Apoyo::ESTATUS_PREPARADO) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Solo un apoyo preparado se puede rechazar.']);
+
+            return back();
+        }
+
+        DB::transaction(function () use ($apoyo) {
+            $this->releaseStock($apoyo->detalles);
+            $apoyo->update(['estatus' => Apoyo::ESTATUS_RECHAZADO]);
+        });
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Apoyo rechazado.']);
+
+        return back();
+    }
+
+    public function facturar(Request $request, Apoyo $apoyo, InvoiceService $invoiceService): RedirectResponse
+    {
+        $this->authorizeAccess($request, $apoyo);
+
+        if ($apoyo->estatus !== Apoyo::ESTATUS_APROBADO) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Solo un apoyo aprobado se puede facturar.']);
+
+            return back();
+        }
+
+        $data = $request->validate($this->facturarValidationRules());
+
+        $customer = Customer::firstOrCreate(['rfc' => $data['rfc']], [
+            'legal_name' => $data['legal_name'],
+            'tax_system' => $data['tax_system'],
+            'zip' => $data['zip'],
+            'email' => $data['email'] ?? null,
+        ]);
+
+        $invoice = $invoiceService->generate(null, $customer, $this->itemsFromDetalles($apoyo), [
+            'payment_form' => $data['payment_form'],
+            'payment_method' => $data['payment_method'],
+            'use' => $data['use'],
+        ]);
+
+        if ($invoice->status === 'failed') {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Error al facturar: '.$invoice->error_message]);
+
+            return back();
+        }
+
+        $apoyo->update(['estatus' => Apoyo::ESTATUS_FACTURADO, 'invoice_id' => $invoice->id]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Apoyo facturado.']);
+
+        return back();
+    }
+
+    public function facturarTodo(Request $request, InvoiceService $invoiceService): RedirectResponse
+    {
+        $data = $request->validate([
+            'payment_form' => ['required', 'string', 'max:2'],
+            'payment_method' => ['required', 'in:PUE,PPD'],
+            'use' => ['required', 'string', 'max:4'],
+        ]);
+
+        $apoyos = $this->visibleApoyos($request)
+            ->where('estatus', Apoyo::ESTATUS_APROBADO)
+            ->with('beneficiario', 'detalles')
+            ->get();
+
+        $facturados = 0;
+        $fallidos = 0;
+
+        foreach ($apoyos as $apoyo) {
+            $customer = $apoyo->rfc !== null
+                ? Customer::firstOrCreate(['rfc' => $apoyo->rfc], [
+                    'legal_name' => $apoyo->beneficiario->nombre,
+                    'tax_system' => '616',
+                    'zip' => '01000',
+                ])
+                : Customer::firstOrCreate(['rfc' => Customer::RFC_PUBLICO_GENERAL], [
+                    'legal_name' => 'PUBLICO EN GENERAL',
+                    'tax_system' => '616',
+                    'zip' => '01000',
+                ]);
+
+            $invoice = $invoiceService->generate(null, $customer, $this->itemsFromDetalles($apoyo), [
+                'payment_form' => $data['payment_form'],
+                'payment_method' => $data['payment_method'],
+                'use' => $data['use'],
+            ]);
+
+            if ($invoice->status === 'failed') {
+                $fallidos++;
+
+                continue;
+            }
+
+            $apoyo->update(['estatus' => Apoyo::ESTATUS_FACTURADO, 'invoice_id' => $invoice->id]);
+            $facturados++;
+        }
+
+        $message = match (true) {
+            $facturados === 0 && $fallidos === 0 => 'No había apoyos aprobados por facturar.',
+            $fallidos === 0 => "{$facturados} apoyo(s) facturado(s).",
+            default => "{$facturados} apoyo(s) facturado(s), {$fallidos} con error.",
+        };
+
+        Inertia::flash('toast', ['type' => $fallidos > 0 && $facturados === 0 ? 'error' : 'success', 'message' => $message]);
+
+        return back();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function facturarValidationRules(): array
+    {
+        return [
+            'rfc' => ['required', 'string', 'max:13'],
+            'legal_name' => ['required', 'string', 'max:255'],
+            'tax_system' => ['required', 'string', 'max:3'],
+            'zip' => ['required', 'string', 'max:5'],
+            'email' => ['nullable', 'email'],
+            'payment_form' => ['required', 'string', 'max:2'],
+            'payment_method' => ['required', 'in:PUE,PPD'],
+            'use' => ['required', 'string', 'max:4'],
+        ];
+    }
+
+    /**
+     * @return list<array{description: string, sat_product_key: string, sat_unit_key: string, quantity: float, unit_price: float}>
+     */
+    protected function itemsFromDetalles(Apoyo $apoyo): array
+    {
+        return array_values($apoyo->detalles->map(fn (DetalleApoyo $detalle) => [
+            'description' => $detalle->articulo,
+            'sat_product_key' => '84111506',
+            'sat_unit_key' => 'E48',
+            'quantity' => (float) $detalle->cantidad,
+            'unit_price' => (float) $detalle->costo_unidad,
+        ])->all());
+    }
+
+    public function descargarXmls(Request $request): BinaryFileResponse|HttpResponse
+    {
+        $facturas = FacturaCompra::query()
+            ->whereHas('articulos.detalleApoyos.apoyo', function (Builder $query) use ($request) {
+                $query->where('estatus', Apoyo::ESTATUS_FACTURADO);
+
+                if (! $request->user()->can('apoyos.view-all')) {
+                    $query->where('user_id', $request->user()->id);
+                }
+            })
+            ->get();
+
+        if ($facturas->isEmpty()) {
+            return response('No hay XMLs de apoyos facturados para descargar.', 404);
+        }
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'apoyos-xml');
+
+        if ($zipPath === false) {
+            abort(500, 'No se pudo preparar el archivo ZIP.');
+        }
+
+        $zip = new ZipArchive;
+        $zip->open($zipPath, ZipArchive::OVERWRITE);
+
+        foreach ($facturas as $factura) {
+            if (Storage::disk('public')->exists($factura->xml_path)) {
+                $zip->addFile(Storage::disk('public')->path($factura->xml_path), basename($factura->xml_path));
+            }
+        }
+
+        $zip->close();
+
+        return response()->download($zipPath, 'facturas-apoyos-facturados.zip')->deleteFileAfterSend();
+    }
+
+    /**
+     * @return Builder<Apoyo>
+     */
+    protected function visibleApoyos(Request $request): Builder
+    {
+        if ($request->user()->can('apoyos.view-all')) {
+            return Apoyo::query();
+        }
+
+        return Apoyo::where('user_id', $request->user()->id);
+    }
+
+    protected function authorizeAccess(Request $request, Apoyo $apoyo): void
+    {
+        abort_unless(
+            $request->user()->can('apoyos.view-all') || $apoyo->user_id === $request->user()->id,
+            403
+        );
     }
 
     /**
@@ -220,8 +457,6 @@ class ApoyoController extends Controller
             'fecha' => ['required', 'date'],
             'beneficiario_id' => ['required', 'exists:beneficiarios,id'],
             'persona_apoya_id' => ['required', 'exists:personas_apoya,id'],
-            'preparado' => ['required', 'boolean'],
-            'facturado' => ['required', 'boolean'],
             'solicitud_recibo' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
             'curp' => ['nullable', 'string', 'max:18'],
             'curp_archivo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],

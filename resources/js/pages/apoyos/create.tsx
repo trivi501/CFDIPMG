@@ -5,7 +5,6 @@ import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Combobox } from '@/components/ui/combobox';
 import type { ComboboxOption } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
@@ -80,8 +79,6 @@ export default function ApoyoCreate({
         fecha: new Date().toISOString().slice(0, 10),
         beneficiario_id: '',
         persona_apoya_id: '',
-        preparado: false as boolean,
-        facturado: false as boolean,
         solicitud_recibo: null as File | null,
         curp: '',
         curp_archivo: null as File | null,
@@ -503,37 +500,6 @@ export default function ApoyoCreate({
                                 />
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="preparado"
-                                    checked={data.preparado}
-                                    onCheckedChange={(checked) =>
-                                        setData('preparado', checked === true)
-                                    }
-                                />
-                                <Label
-                                    htmlFor="preparado"
-                                    className="font-normal"
-                                >
-                                    Preparado
-                                </Label>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="facturado"
-                                    checked={data.facturado}
-                                    onCheckedChange={(checked) =>
-                                        setData('facturado', checked === true)
-                                    }
-                                />
-                                <Label
-                                    htmlFor="facturado"
-                                    className="font-normal"
-                                >
-                                    Facturado
-                                </Label>
-                            </div>
                         </CardContent>
                     </Card>
 

@@ -8,15 +8,24 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Apoyo extends Model
 {
+    public const ESTATUS_PREPARADO = 'preparado';
+
+    public const ESTATUS_APROBADO = 'aprobado';
+
+    public const ESTATUS_FACTURADO = 'facturado';
+
+    public const ESTATUS_RECHAZADO = 'rechazado';
+
     protected $fillable = [
         'fecha',
         'beneficiario_id',
         'persona_apoya_id',
+        'user_id',
+        'estatus',
+        'invoice_id',
         'sub_total',
         'iva',
         'monto_total',
-        'preparado',
-        'facturado',
         'solicitud_recibo_path',
         'curp',
         'curp_path',
@@ -33,8 +42,6 @@ class Apoyo extends Model
             'sub_total' => 'decimal:2',
             'iva' => 'decimal:2',
             'monto_total' => 'decimal:2',
-            'preparado' => 'boolean',
-            'facturado' => 'boolean',
         ];
     }
 
@@ -55,10 +62,26 @@ class Apoyo extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
      * @return HasMany<DetalleApoyo, $this>
      */
     public function detalles(): HasMany
     {
         return $this->hasMany(DetalleApoyo::class);
+    }
+
+    /**
+     * @return BelongsTo<Invoice, $this>
+     */
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class);
     }
 }

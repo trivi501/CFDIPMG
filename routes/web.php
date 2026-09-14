@@ -83,9 +83,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('facturas-compra', [FacturaCompraController::class, 'store'])
             ->middleware('permission:apoyos.manage')
             ->name('facturas-compra.store');
+        Route::post('apoyos/facturar-todo', [ApoyoController::class, 'facturarTodo'])
+            ->middleware('permission:apoyos.facturar')
+            ->name('apoyos.facturar-todo');
+        Route::get('apoyos/descargar-xmls', [ApoyoController::class, 'descargarXmls'])
+            ->middleware('permission:apoyos.download-all')
+            ->name('apoyos.descargar-xmls');
         Route::resource('apoyos', ApoyoController::class)
-            ->except(['show'])
             ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');
+        Route::patch('apoyos/{apoyo}/aprobar', [ApoyoController::class, 'aprobar'])
+            ->middleware('permission:apoyos.approve')
+            ->name('apoyos.aprobar');
+        Route::patch('apoyos/{apoyo}/rechazar', [ApoyoController::class, 'rechazar'])
+            ->middleware('permission:apoyos.approve')
+            ->name('apoyos.rechazar');
+        Route::patch('apoyos/{apoyo}/facturar', [ApoyoController::class, 'facturar'])
+            ->middleware('permission:apoyos.facturar')
+            ->name('apoyos.facturar');
         Route::resource('beneficiarios', BeneficiarioController::class)
             ->except(['show'])
             ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');
