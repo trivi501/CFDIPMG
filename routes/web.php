@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FacturaCompraController;
 use App\Http\Controllers\GlobalInvoiceController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PaqueteController;
 use App\Http\Controllers\PersonaApoyaController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReceiptController;
@@ -100,6 +101,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('apoyos/{apoyo}/facturar', [ApoyoController::class, 'facturar'])
             ->middleware('permission:apoyos.facturar')
             ->name('apoyos.facturar');
+        Route::resource('paquetes', PaqueteController::class)
+            ->except(['show'])
+            ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');
         Route::resource('beneficiarios', BeneficiarioController::class)
             ->except(['show'])
             ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');

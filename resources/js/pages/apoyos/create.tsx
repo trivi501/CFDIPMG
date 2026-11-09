@@ -3,6 +3,7 @@ import { Plus, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { PaqueteSelector } from '@/components/paquete-selector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
@@ -19,6 +20,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { getXsrfToken } from '@/lib/csrf';
+import type { LineaPaquete, Paquete } from '@/lib/paquetes';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
 import beneficiariosRoutes from '@/routes/beneficiarios';
@@ -70,10 +72,12 @@ export default function ApoyoCreate({
     beneficiarios,
     personasApoya,
     facturasDisponibles: initialFacturasDisponibles,
+    paquetes,
 }: {
     beneficiarios: Beneficiario[];
     personasApoya: PersonaApoya[];
     facturasDisponibles: FacturaDisponible[];
+    paquetes: Paquete[];
 }) {
     const { data, setData, post, processing, errors } = useForm({
         fecha: new Date().toISOString().slice(0, 10),
@@ -259,6 +263,19 @@ export default function ApoyoCreate({
 
     const addDetalle = () =>
         setData('detalles', [...data.detalles, emptyDetalle()]);
+
+    const agregarPaquete = (
+        lineas: LineaPaquete[],
+        facturas: FacturaDisponible[],
+    ) => {
+        setData('detalles', [
+            ...data.detalles.filter(
+                (detalle) => detalle.articulo.trim() !== '',
+            ),
+            ...lineas,
+        ]);
+        setFacturasDisponibles(facturas);
+    };
 
     const removeDetalle = (index: number) => {
         const detalle = data.detalles[index];
@@ -499,7 +516,6 @@ export default function ApoyoCreate({
                                     message={errors.comprobante_domicilio}
                                 />
                             </div>
-
                         </CardContent>
                     </Card>
 
@@ -618,6 +634,12 @@ export default function ApoyoCreate({
                                     <Plus /> Agregar al detalle
                                 </Button>
                             </div>
+
+                            <PaqueteSelector
+                                paquetes={paquetes}
+                                facturas={facturasDisponibles}
+                                onAgregar={agregarPaquete}
+                            />
                         </CardContent>
                     </Card>
 

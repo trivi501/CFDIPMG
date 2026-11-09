@@ -8,6 +8,7 @@ use App\Models\Beneficiario;
 use App\Models\Customer;
 use App\Models\DetalleApoyo;
 use App\Models\FacturaCompra;
+use App\Models\Paquete;
 use App\Models\PersonaApoya;
 use App\Services\InvoiceService;
 use App\Support\UsoCfdi;
@@ -47,6 +48,7 @@ class ApoyoController extends Controller
             'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre']),
             'personasApoya' => PersonaApoya::orderBy('nombre')->get(['id', 'nombre']),
             'facturasDisponibles' => $this->facturasDisponibles(),
+            'paquetes' => Paquete::with('articulos')->orderBy('nombre')->get(),
         ]);
     }
 
@@ -104,6 +106,7 @@ class ApoyoController extends Controller
             'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre']),
             'personasApoya' => PersonaApoya::orderBy('nombre')->get(['id', 'nombre']),
             'facturasDisponibles' => $this->facturasDisponibles(),
+            'paquetes' => Paquete::with('articulos')->orderBy('nombre')->get(),
         ]);
     }
 

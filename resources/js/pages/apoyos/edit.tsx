@@ -3,6 +3,7 @@ import { Plus, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { PaqueteSelector } from '@/components/paquete-selector';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +21,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { getXsrfToken } from '@/lib/csrf';
+import type { LineaPaquete, Paquete } from '@/lib/paquetes';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
 import beneficiariosRoutes from '@/routes/beneficiarios';
@@ -114,11 +116,13 @@ export default function ApoyoEdit({
     beneficiarios,
     personasApoya,
     facturasDisponibles: initialFacturasDisponibles,
+    paquetes,
 }: {
     apoyo: Apoyo;
     beneficiarios: Beneficiario[];
     personasApoya: PersonaApoya[];
     facturasDisponibles: FacturaDisponible[];
+    paquetes: Paquete[];
 }) {
     const { data, setData, put, processing, errors } = useForm({
         fecha: apoyo.fecha,
@@ -313,6 +317,19 @@ export default function ApoyoEdit({
                 iva: '0',
             },
         ]);
+
+    const agregarPaquete = (
+        lineas: LineaPaquete[],
+        facturas: FacturaDisponible[],
+    ) => {
+        setData('detalles', [
+            ...data.detalles.filter(
+                (detalle) => detalle.articulo.trim() !== '',
+            ),
+            ...lineas,
+        ]);
+        setFacturasDisponibles(facturas);
+    };
 
     const removeDetalle = (index: number) => {
         const detalle = data.detalles[index];
@@ -602,16 +619,14 @@ export default function ApoyoEdit({
                                 <Label>Estatus</Label>
                                 <div>
                                     <Badge
-                                        variant={
-                                            estatusVariants[apoyo.estatus]
-                                        }
+                                        variant={estatusVariants[apoyo.estatus]}
                                     >
                                         {estatusLabels[apoyo.estatus]}
                                     </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground">
-                                    Aprobar y facturar se hacen desde el
-                                    listado de apoyos.
+                                    Aprobar y facturar se hacen desde el listado
+                                    de apoyos.
                                 </p>
                             </div>
                         </CardContent>
@@ -732,6 +747,12 @@ export default function ApoyoEdit({
                                     <Plus /> Agregar al detalle
                                 </Button>
                             </div>
+
+                            <PaqueteSelector
+                                paquetes={paquetes}
+                                facturas={facturasDisponibles}
+                                onAgregar={agregarPaquete}
+                            />
                         </CardContent>
                     </Card>
 

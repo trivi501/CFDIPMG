@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import {
+    Boxes,
     FileCheck2,
     FileText,
     HandCoins,
@@ -33,6 +34,7 @@ import beneficiarios from '@/routes/beneficiarios';
 import customers from '@/routes/customers';
 import facturasCompra from '@/routes/facturas-compra';
 import invoices from '@/routes/invoices';
+import paquetes from '@/routes/paquetes';
 import personasApoya from '@/routes/personas-apoya';
 import products from '@/routes/products';
 import receipts from '@/routes/receipts';
@@ -101,6 +103,11 @@ export function AppSidebar() {
             title: 'Facturas de compra',
             href: facturasCompra.index(),
             icon: FileText,
+        });
+        apoyosNavItems.push({
+            title: 'Paquetes',
+            href: paquetes.index(),
+            icon: Boxes,
         });
     }
 
