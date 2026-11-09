@@ -44,7 +44,7 @@ class OpenInvoiceTest extends TestCase
             'customer_id' => $customer->id,
             'payment_form' => '03',
             'payment_method' => 'PUE',
-            'use' => 'G03',
+            'use' => 'S01',
             'items' => [[
                 'description' => 'Servicio sin recibo registrado',
                 'sat_product_key' => '80141600',

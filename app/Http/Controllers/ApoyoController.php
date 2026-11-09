@@ -10,6 +10,7 @@ use App\Models\DetalleApoyo;
 use App\Models\FacturaCompra;
 use App\Models\PersonaApoya;
 use App\Services\InvoiceService;
+use App\Support\UsoCfdi;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -200,6 +201,12 @@ class ApoyoController extends Controller
 
         $data = $request->validate($this->facturarValidationRules());
 
+        // Un RFC ya registrado factura con su régimen guardado, no con el capturado en el formulario.
+        UsoCfdi::validar(
+            $data['use'],
+            Customer::where('rfc', $data['rfc'])->value('tax_system') ?? $data['tax_system'],
+        );
+
         $customer = Customer::firstOrCreate(['rfc' => $data['rfc']], [
             'legal_name' => $data['legal_name'],
             'tax_system' => $data['tax_system'],
@@ -254,6 +261,12 @@ class ApoyoController extends Controller
                     'tax_system' => '616',
                     'zip' => '01000',
                 ]);
+
+            if (! UsoCfdi::permitido($data['use'], $customer->tax_system)) {
+                $fallidos++;
+
+                continue;
+            }
 
             $invoice = $invoiceService->generate(null, $customer, $this->itemsFromDetalles($apoyo), [
                 'payment_form' => $data['payment_form'],

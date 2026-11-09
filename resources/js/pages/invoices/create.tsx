@@ -7,11 +7,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
-import { CFDI_USES, PAYMENT_FORMS, PAYMENT_METHODS } from '@/lib/sat-catalogs';
+import {
+    PAYMENT_FORMS,
+    PAYMENT_METHODS,
+    pickUseForRegime,
+    usesForRegime,
+} from '@/lib/sat-catalogs';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
 
-type Customer = { id: number; legal_name: string; rfc: string };
+type Customer = {
+    id: number;
+    legal_name: string;
+    rfc: string;
+    tax_system: string;
+};
 
 type Product = {
     id: number;
@@ -50,9 +60,21 @@ export default function InvoiceCreate({
         customer_id: '',
         payment_form: '03',
         payment_method: 'PUE',
-        use: 'G03',
+        use: '',
         items: [emptyItem()] as Item[],
     });
+
+    const regimeOf = (customerId: string) =>
+        customers.find((customer) => String(customer.id) === customerId)
+            ?.tax_system;
+    const allowedUses = usesForRegime(regimeOf(data.customer_id));
+
+    const changeCustomer = (customerId: string) =>
+        setData({
+            ...data,
+            customer_id: customerId,
+            use: pickUseForRegime(data.use, regimeOf(customerId)),
+        });
 
     const updateItem = (index: number, patch: Partial<Item>) => {
         setData(
@@ -123,7 +145,7 @@ export default function InvoiceCreate({
                                     id="customer_id"
                                     value={data.customer_id}
                                     onChange={(e) =>
-                                        setData('customer_id', e.target.value)
+                                        changeCustomer(e.target.value)
                                     }
                                     required
                                 >
@@ -202,9 +224,15 @@ export default function InvoiceCreate({
                                     onChange={(e) =>
                                         setData('use', e.target.value)
                                     }
+                                    disabled={allowedUses.length === 0}
                                     required
                                 >
-                                    {CFDI_USES.map((option) => (
+                                    {allowedUses.length === 0 && (
+                                        <option value="">
+                                            Primero selecciona un cliente
+                                        </option>
+                                    )}
+                                    {allowedUses.map((option) => (
                                         <option
                                             key={option.value}
                                             value={option.value}

@@ -15,7 +15,12 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { CFDI_USES, PAYMENT_FORMS, PAYMENT_METHODS } from '@/lib/sat-catalogs';
+import {
+    PAYMENT_FORMS,
+    PAYMENT_METHODS,
+    pickUseForRegime,
+    usesForRegime,
+} from '@/lib/sat-catalogs';
 import { dashboard } from '@/routes';
 import receipts from '@/routes/receipts';
 
@@ -29,7 +34,12 @@ type Receipt = {
     customer_payload: { name?: string; email?: string; rfc?: string };
 };
 
-type Customer = { id: number; legal_name: string; rfc: string };
+type Customer = {
+    id: number;
+    legal_name: string;
+    rfc: string;
+    tax_system: string;
+};
 
 type Product = {
     id: number;
@@ -132,13 +142,29 @@ export default function ReceiptInvoice({
     suggestedPaymentForm: string | null;
     taxIncludedInPrice: boolean;
 }) {
+    const regimeOf = (customerId: string) =>
+        customers.find((customer) => String(customer.id) === customerId)
+            ?.tax_system;
+    const initialCustomerId = suggestedCustomerId
+        ? String(suggestedCustomerId)
+        : '';
+
     const { data, setData, post, processing, errors } = useForm({
-        customer_id: suggestedCustomerId ? String(suggestedCustomerId) : '',
+        customer_id: initialCustomerId,
         payment_form: suggestedPaymentForm ?? '03',
         payment_method: 'PUE',
-        use: 'G03',
+        use: pickUseForRegime('G03', regimeOf(initialCustomerId)),
         items: [emptyItem(receipt)] as Item[],
     });
+
+    const allowedUses = usesForRegime(regimeOf(data.customer_id));
+
+    const changeCustomer = (customerId: string) =>
+        setData({
+            ...data,
+            customer_id: customerId,
+            use: pickUseForRegime(data.use, regimeOf(customerId)),
+        });
 
     const updateItem = (index: number, patch: Partial<Item>) => {
         setData(
@@ -209,7 +235,7 @@ export default function ReceiptInvoice({
                                     id="customer_id"
                                     value={data.customer_id}
                                     onChange={(e) =>
-                                        setData('customer_id', e.target.value)
+                                        changeCustomer(e.target.value)
                                     }
                                     required
                                 >
@@ -290,9 +316,15 @@ export default function ReceiptInvoice({
                                     onChange={(e) =>
                                         setData('use', e.target.value)
                                     }
+                                    disabled={allowedUses.length === 0}
                                     required
                                 >
-                                    {CFDI_USES.map((option) => (
+                                    {allowedUses.length === 0 && (
+                                        <option value="">
+                                            Primero selecciona un cliente
+                                        </option>
+                                    )}
+                                    {allowedUses.map((option) => (
                                         <option
                                             key={option.value}
                                             value={option.value}

@@ -93,6 +93,20 @@ class ReceiptLookupTest extends TestCase
         $this->assertSame(0, PaymentReceipt::count());
     }
 
+    public function test_it_refuses_a_folio_that_matches_more_than_one_payment(): void
+    {
+        Http::fake([
+            'localhost:8080/api/pagos/*' => Http::response(['error' => 'Ese folio corresponde a más de un pago.'], 409),
+        ]);
+
+        $this->actingAs($this->billingUser())
+            ->post('/receipts/lookup', ['folio' => 'PAG-000249'])
+            ->assertRedirect()
+            ->assertSessionHasErrors('folio');
+
+        $this->assertSame(0, PaymentReceipt::count());
+    }
+
     public function test_it_refuses_to_ingest_a_payment_that_is_not_marked_as_paid(): void
     {
         Http::fake([

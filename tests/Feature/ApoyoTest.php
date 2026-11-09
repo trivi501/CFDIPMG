@@ -24,6 +24,7 @@ class ApoyoTest extends TestCase
     {
         parent::setUp();
 
+        $this->withoutVite();
         $this->seed(RolesAndPermissionsSeeder::class);
     }
 
@@ -68,7 +69,7 @@ class ApoyoTest extends TestCase
             'zip' => '01000',
             'payment_form' => '01',
             'payment_method' => 'PUE',
-            'use' => 'G03',
+            'use' => 'S01',
         ], $overrides);
     }
 
@@ -460,7 +461,7 @@ class ApoyoTest extends TestCase
         $this->actingAs($admin)->post('/apoyos/facturar-todo', [
             'payment_form' => '01',
             'payment_method' => 'PUE',
-            'use' => 'G03',
+            'use' => 'S01',
         ])->assertRedirect();
 
         $apoyo->refresh();

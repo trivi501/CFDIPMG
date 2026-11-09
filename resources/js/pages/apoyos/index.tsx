@@ -3,8 +3,8 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button';
 import Heading from '@/components/heading';
-import { Pagination  } from '@/components/pagination';
-import type {Paginator} from '@/components/pagination';
+import { Pagination } from '@/components/pagination';
+import type { Paginator } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +26,12 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
-import { CFDI_USES, PAYMENT_FORMS, PAYMENT_METHODS } from '@/lib/sat-catalogs';
+import {
+    CFDI_USES,
+    PAYMENT_FORMS,
+    PAYMENT_METHODS,
+    UNIVERSAL_USE,
+} from '@/lib/sat-catalogs';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
 
@@ -90,7 +95,7 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
     const facturarTodoForm = useForm({
         payment_form: '01',
         payment_method: 'PUE',
-        use: 'G03',
+        use: UNIVERSAL_USE,
     });
 
     const facturarTodo = (e: React.FormEvent) => {
@@ -237,9 +242,7 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                                                 size="sm"
                                                 asChild
                                             >
-                                                <Link
-                                                    href={apoyos.show(apoyo)}
-                                                >
+                                                <Link href={apoyos.show(apoyo)}>
                                                     Ver
                                                 </Link>
                                             </Button>
@@ -311,8 +314,10 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                         <p className="text-sm text-muted-foreground">
                             Se generará una factura real para cada apoyo
                             aprobado visible, usando el RFC capturado en cada
-                            uno (o "Público en general" si no tiene) con
-                            estos mismos datos fiscales.
+                            uno (o "Público en general" si no tiene) con estos
+                            mismos datos fiscales. Como cada cliente puede tener
+                            otro régimen, aquí solo se ofrece el uso válido para
+                            todos.
                         </p>
                         <div className="grid gap-2">
                             <Label htmlFor="bulk_use">Uso CFDI</Label>
@@ -326,7 +331,9 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                                     )
                                 }
                             >
-                                {CFDI_USES.map((option) => (
+                                {CFDI_USES.filter(
+                                    (option) => option.value === UNIVERSAL_USE,
+                                ).map((option) => (
                                     <option
                                         key={option.value}
                                         value={option.value}

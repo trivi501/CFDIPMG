@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\Product;
 use App\Services\Facturapi\FacturapiClient;
 use App\Services\InvoiceService;
+use App\Support\UsoCfdi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -36,7 +37,7 @@ class InvoiceController extends Controller
     public function create(): Response
     {
         return Inertia::render('invoices/create', [
-            'customers' => Customer::orderBy('legal_name')->get(['id', 'legal_name', 'rfc']),
+            'customers' => Customer::orderBy('legal_name')->get(['id', 'legal_name', 'rfc', 'tax_system']),
             'products' => Product::where('is_active', true)->orderBy('description')->get(),
         ]);
     }
@@ -57,6 +58,8 @@ class InvoiceController extends Controller
         ]);
 
         $customer = Customer::query()->where('id', $data['customer_id'])->firstOrFail();
+
+        UsoCfdi::validar($data['use'], $customer->tax_system);
 
         $invoice = $invoiceService->generate(null, $customer, $data['items'], [
             'payment_form' => $data['payment_form'],

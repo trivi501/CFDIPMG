@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\PaymentReceipt;
 use App\Models\Product;
 use App\Services\InvoiceService;
+use App\Support\UsoCfdi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -39,7 +40,7 @@ class ReceiptController extends Controller
 
         return Inertia::render('receipts/invoice', [
             'receipt' => $receipt,
-            'customers' => Customer::orderBy('legal_name')->get(['id', 'legal_name', 'rfc']),
+            'customers' => Customer::orderBy('legal_name')->get(['id', 'legal_name', 'rfc', 'tax_system']),
             'products' => Product::where('is_active', true)->orderBy('description')->get(),
             'pagos' => $pagos['data'] ?? null,
             'suggestedCustomerId' => $pagos['suggestedCustomerId'] ?? null,
@@ -109,6 +110,8 @@ class ReceiptController extends Controller
         }
 
         $customer = Customer::query()->where('id', $data['customer_id'])->firstOrFail();
+
+        UsoCfdi::validar($data['use'], $customer->tax_system);
 
         $invoice = $invoiceService->generate($receipt, $customer, $data['items'], [
             'payment_form' => $data['payment_form'],

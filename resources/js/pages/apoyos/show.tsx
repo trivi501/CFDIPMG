@@ -17,10 +17,11 @@ import {
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
 import {
-    CFDI_USES,
     PAYMENT_FORMS,
     PAYMENT_METHODS,
+    pickUseForRegime,
     TAX_SYSTEMS,
+    usesForRegime,
 } from '@/lib/sat-catalogs';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
@@ -167,12 +168,14 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
         email: '',
         payment_form: '01',
         payment_method: 'PUE',
-        use: 'G03',
+        use: pickUseForRegime('G03', '616'),
     });
 
     const facturar = (e: React.FormEvent) => {
         e.preventDefault();
-        facturarForm.patch(apoyos.facturar(apoyo).url, { preserveScroll: true });
+        facturarForm.patch(apoyos.facturar(apoyo).url, {
+            preserveScroll: true,
+        });
     };
 
     return (
@@ -188,9 +191,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                         {apoyo.estatus === 'preparado' &&
                             can('apoyos.approve') && (
                                 <>
-                                    <Button onClick={aprobar}>
-                                        Aprobado
-                                    </Button>
+                                    <Button onClick={aprobar}>Aprobado</Button>
                                     <Button
                                         variant="destructive"
                                         onClick={rechazar}
@@ -232,14 +233,10 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                             <p className="text-sm text-muted-foreground">
                                 CURP
                             </p>
-                            <p className="font-medium">
-                                {apoyo.curp || '—'}
-                            </p>
+                            <p className="font-medium">{apoyo.curp || '—'}</p>
                         </div>
                         <div>
-                            <p className="text-sm text-muted-foreground">
-                                RFC
-                            </p>
+                            <p className="text-sm text-muted-foreground">RFC</p>
                             <p className="font-medium">{apoyo.rfc || '—'}</p>
                         </div>
                         <div>
@@ -251,9 +248,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                             </p>
                         </div>
                         <div>
-                            <p className="text-sm text-muted-foreground">
-                                IVA
-                            </p>
+                            <p className="text-sm text-muted-foreground">IVA</p>
                             <p className="font-medium">
                                 {currency.format(Number(apoyo.iva))}
                             </p>
@@ -313,9 +308,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {currency.format(
-                                                    Number(
-                                                        detalle.sub_total,
-                                                    ),
+                                                    Number(detalle.sub_total),
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -384,9 +377,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                 <div className="flex items-end gap-2">
                                     <Button variant="outline" asChild>
                                         <Link
-                                            href={invoices.show(
-                                                apoyo.invoice,
-                                            )}
+                                            href={invoices.show(apoyo.invoice)}
                                         >
                                             Ver factura
                                         </Link>
@@ -469,9 +460,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                         required
                                     />
                                     <InputError
-                                        message={
-                                            facturarForm.errors.legal_name
-                                        }
+                                        message={facturarForm.errors.legal_name}
                                     />
                                 </div>
                                 <div className="grid gap-2">
@@ -482,10 +471,14 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                         id="tax_system"
                                         value={facturarForm.data.tax_system}
                                         onChange={(e) =>
-                                            facturarForm.setData(
-                                                'tax_system',
-                                                e.target.value,
-                                            )
+                                            facturarForm.setData({
+                                                ...facturarForm.data,
+                                                tax_system: e.target.value,
+                                                use: pickUseForRegime(
+                                                    facturarForm.data.use,
+                                                    e.target.value,
+                                                ),
+                                            })
                                         }
                                     >
                                         {TAX_SYSTEMS.map((option) => (
@@ -498,9 +491,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                         ))}
                                     </NativeSelect>
                                     <InputError
-                                        message={
-                                            facturarForm.errors.tax_system
-                                        }
+                                        message={facturarForm.errors.tax_system}
                                     />
                                 </div>
                                 <div className="grid gap-2">
@@ -552,7 +543,9 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                             )
                                         }
                                     >
-                                        {CFDI_USES.map((option) => (
+                                        {usesForRegime(
+                                            facturarForm.data.tax_system,
+                                        ).map((option) => (
                                             <option
                                                 key={option.value}
                                                 value={option.value}
@@ -600,9 +593,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                     </Label>
                                     <NativeSelect
                                         id="payment_method"
-                                        value={
-                                            facturarForm.data.payment_method
-                                        }
+                                        value={facturarForm.data.payment_method}
                                         onChange={(e) =>
                                             facturarForm.setData(
                                                 'payment_method',

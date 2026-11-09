@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentReceipt;
 use App\Services\Pagos\PagosClient;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -55,7 +56,17 @@ class ReceiptLookupController extends Controller
             'folio' => ['required', 'string', 'max:191'],
         ]);
 
-        $pago = $pagos->find($data['folio']);
+        try {
+            $pago = $pagos->find($data['folio']);
+        } catch (RequestException $exception) {
+            if ($exception->response->status() !== 409) {
+                throw $exception;
+            }
+
+            Inertia::flash('toast', ['type' => 'error', 'message' => "El folio \"{$data['folio']}\" corresponde a más de un pago en el sistema de cobro; hay que corregirlo allá antes de facturar."]);
+
+            return back()->withErrors(['folio' => 'Folio duplicado en el sistema de cobro.']);
+        }
 
         if ($pago === null) {
             Inertia::flash('toast', ['type' => 'error', 'message' => "No se encontró un pago con el folio \"{$data['folio']}\"."]);
