@@ -119,7 +119,7 @@ class ApoyoTest extends TestCase
 
     public function test_it_stores_the_uploaded_solicitud_recibo_file(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
 
         $file = UploadedFile::fake()->create('solicitud.pdf', 100, 'application/pdf');
 
@@ -128,7 +128,7 @@ class ApoyoTest extends TestCase
         $apoyo = Apoyo::firstOrFail();
 
         $this->assertNotNull($apoyo->solicitud_recibo_path);
-        Storage::disk('public')->assertExists($apoyo->solicitud_recibo_path);
+        Storage::disk('local')->assertExists($apoyo->solicitud_recibo_path);
     }
 
     public function test_updating_an_apoyo_replaces_its_detalles(): void

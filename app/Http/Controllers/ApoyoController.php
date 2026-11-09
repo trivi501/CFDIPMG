@@ -23,6 +23,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
 
 class ApoyoController extends Controller
@@ -69,7 +70,7 @@ class ApoyoController extends Controller
                 'rfc' => $data['rfc'] ?? null,
                 ...$this->computeTotals($data['detalles']),
                 'solicitud_recibo_path' => $request->hasFile('solicitud_recibo')
-                    ? $request->file('solicitud_recibo')->store('apoyos', 'public')
+                    ? $request->file('solicitud_recibo')->store('apoyos', 'local')
                     : null,
                 ...$this->storedDocumentPaths($request),
             ]);
@@ -93,6 +94,24 @@ class ApoyoController extends Controller
         return Inertia::render('apoyos/show', [
             'apoyo' => $apoyo,
         ]);
+    }
+
+    public function documento(Request $request, Apoyo $apoyo, string $tipo): StreamedResponse
+    {
+        $this->authorizeAccess($request, $apoyo);
+
+        $path = match ($tipo) {
+            'solicitud_recibo' => $apoyo->solicitud_recibo_path,
+            'curp' => $apoyo->curp_path,
+            'rfc' => $apoyo->rfc_path,
+            'ine' => $apoyo->ine_path,
+            'comprobante_domicilio' => $apoyo->comprobante_domicilio_path,
+            default => null,
+        };
+
+        abort_unless($path !== null && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path, null, ['X-Content-Type-Options' => 'nosniff']);
     }
 
     public function edit(Request $request, Apoyo $apoyo): Response
@@ -130,7 +149,7 @@ class ApoyoController extends Controller
                 'rfc' => $data['rfc'] ?? null,
                 ...$this->computeTotals($data['detalles']),
                 'solicitud_recibo_path' => $request->hasFile('solicitud_recibo')
-                    ? $request->file('solicitud_recibo')->store('apoyos', 'public')
+                    ? $request->file('solicitud_recibo')->store('apoyos', 'local')
                     : $apoyo->solicitud_recibo_path,
                 ...$this->storedDocumentPaths($request, $apoyo),
             ]);
@@ -355,8 +374,8 @@ class ApoyoController extends Controller
         $zip->open($zipPath, ZipArchive::OVERWRITE);
 
         foreach ($facturas as $factura) {
-            if (Storage::disk('public')->exists($factura->xml_path)) {
-                $zip->addFile(Storage::disk('public')->path($factura->xml_path), basename($factura->xml_path));
+            if (Storage::disk('local')->exists($factura->xml_path)) {
+                $zip->addFile(Storage::disk('local')->path($factura->xml_path), basename($factura->xml_path));
             }
         }
 
@@ -451,7 +470,7 @@ class ApoyoController extends Controller
                 return null;
             }
 
-            $path = $request->file($field)->store('apoyos', 'public');
+            $path = $request->file($field)->store('apoyos', 'local');
 
             return $path === false ? null : $path;
         };

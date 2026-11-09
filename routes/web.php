@@ -81,6 +81,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('permission:apoyos.view')->group(function () {
         Route::get('facturas-compra', [FacturaCompraController::class, 'index'])->name('facturas-compra.index');
+        Route::get('facturas-compra/{factura}/xml', [FacturaCompraController::class, 'xml'])->name('facturas-compra.xml');
+        Route::get('apoyos/{apoyo}/documentos/{tipo}', [ApoyoController::class, 'documento'])->name('apoyos.documento');
         Route::post('facturas-compra', [FacturaCompraController::class, 'store'])
             ->middleware('permission:apoyos.manage')
             ->name('facturas-compra.store');

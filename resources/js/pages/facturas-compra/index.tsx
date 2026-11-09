@@ -163,12 +163,10 @@ export default function FacturasCompraIndex({
                                 )}
                             </CardTitle>
                             <a
-                                href={`/storage/${factura.xml_path}`}
-                                target="_blank"
-                                rel="noreferrer"
+                                href={facturasCompra.xml(factura.id).url}
                                 className="text-sm text-primary underline"
                             >
-                                Ver XML
+                                Descargar XML
                             </a>
                         </CardHeader>
                         <CardContent>

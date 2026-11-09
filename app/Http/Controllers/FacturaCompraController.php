@@ -10,9 +10,11 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FacturaCompraController extends Controller
 {
@@ -21,6 +23,18 @@ class FacturaCompraController extends Controller
         return Inertia::render('facturas-compra/index', [
             'facturas' => FacturaCompra::with('articulos')->latest('fecha')->get(),
         ]);
+    }
+
+    // Se descarga, no se abre: un XML subido podría ejecutar código en el navegador.
+    public function xml(FacturaCompra $factura): StreamedResponse
+    {
+        abort_unless(Storage::disk('local')->exists($factura->xml_path), 404);
+
+        return Storage::disk('local')->download(
+            $factura->xml_path,
+            "factura-compra-{$factura->id}.xml",
+            ['X-Content-Type-Options' => 'nosniff'],
+        );
     }
 
     public function store(Request $request, CfdiXmlParser $parser): RedirectResponse|JsonResponse
@@ -57,7 +71,7 @@ class FacturaCompraController extends Controller
             return $this->uploadError($request, "Esta factura ya fue registrada ({$duplicate->emisor}, {$fecha}).");
         }
 
-        $path = $request->file('xml')->store('facturas-compra', 'public');
+        $path = $request->file('xml')->store('facturas-compra', 'local');
 
         try {
             $factura = DB::transaction(function () use ($parsed, $path, $hash) {

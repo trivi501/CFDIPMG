@@ -19,7 +19,7 @@ class FacturaCompraTest extends TestCase
         parent::setUp();
 
         $this->seed(RolesAndPermissionsSeeder::class);
-        Storage::fake('public');
+        Storage::fake('local');
     }
 
     protected function billingUser(): User
@@ -73,7 +73,7 @@ class FacturaCompraTest extends TestCase
         $this->assertEquals(10, (float) $despensa->cantidad_disponible);
         $this->assertEquals(250, (float) $despensa->costo_unidad);
 
-        Storage::disk('public')->assertExists($factura->xml_path);
+        Storage::disk('local')->assertExists($factura->xml_path);
     }
 
     public function test_parsing_a_non_cfdi_xml_returns_a_422_with_a_message(): void

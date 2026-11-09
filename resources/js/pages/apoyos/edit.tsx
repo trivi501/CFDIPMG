@@ -318,6 +318,9 @@ export default function ApoyoEdit({
             },
         ]);
 
+    const documentoUrl = (tipo: string) =>
+        apoyos.documento({ apoyo: apoyo.id, tipo }).url;
+
     const agregarPaquete = (
         lineas: LineaPaquete[],
         facturas: FacturaDisponible[],
@@ -455,7 +458,7 @@ export default function ApoyoEdit({
                                 </Label>
                                 {apoyo.solicitud_recibo_path && (
                                     <a
-                                        href={`/storage/${apoyo.solicitud_recibo_path}`}
+                                        href={documentoUrl('solicitud_recibo')}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="text-sm text-primary underline"
@@ -496,7 +499,7 @@ export default function ApoyoEdit({
                                 </Label>
                                 {apoyo.curp_path && (
                                     <a
-                                        href={`/storage/${apoyo.curp_path}`}
+                                        href={documentoUrl('curp')}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="text-sm text-primary underline"
@@ -537,7 +540,7 @@ export default function ApoyoEdit({
                                 </Label>
                                 {apoyo.rfc_path && (
                                     <a
-                                        href={`/storage/${apoyo.rfc_path}`}
+                                        href={documentoUrl('rfc')}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="text-sm text-primary underline"
@@ -563,7 +566,7 @@ export default function ApoyoEdit({
                                 <Label htmlFor="ine">INE</Label>
                                 {apoyo.ine_path && (
                                     <a
-                                        href={`/storage/${apoyo.ine_path}`}
+                                        href={documentoUrl('ine')}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="text-sm text-primary underline"
@@ -591,7 +594,9 @@ export default function ApoyoEdit({
                                 </Label>
                                 {apoyo.comprobante_domicilio_path && (
                                     <a
-                                        href={`/storage/${apoyo.comprobante_domicilio_path}`}
+                                        href={documentoUrl(
+                                            'comprobante_domicilio',
+                                        )}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="text-sm text-primary underline"

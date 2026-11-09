@@ -98,9 +98,11 @@ function isImagen(path: string): boolean {
 function DocumentoViewer({
     label,
     path,
+    url,
 }: {
     label: string;
     path: string | null;
+    url: string;
 }) {
     if (!path) {
         return (
@@ -112,8 +114,6 @@ function DocumentoViewer({
             </div>
         );
     }
-
-    const url = `/storage/${path}`;
 
     return (
         <div className="grid gap-2">
@@ -147,6 +147,8 @@ function DocumentoViewer({
 
 export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
     const { can } = usePermissions();
+    const documentoUrl = (tipo: string) =>
+        apoyos.documento({ apoyo: apoyo.id, tipo }).url;
 
     const aprobar = () => {
         router.patch(apoyos.aprobar(apoyo).url, {}, { preserveScroll: true });
@@ -332,19 +334,27 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                         <DocumentoViewer
                             label="Solicitud Recibo"
                             path={apoyo.solicitud_recibo_path}
+                            url={documentoUrl('solicitud_recibo')}
                         />
                         <DocumentoViewer
                             label="CURP (archivo)"
                             path={apoyo.curp_path}
+                            url={documentoUrl('curp')}
                         />
                         <DocumentoViewer
                             label="RFC (archivo)"
                             path={apoyo.rfc_path}
+                            url={documentoUrl('rfc')}
                         />
-                        <DocumentoViewer label="INE" path={apoyo.ine_path} />
+                        <DocumentoViewer
+                            label="INE"
+                            path={apoyo.ine_path}
+                            url={documentoUrl('ine')}
+                        />
                         <DocumentoViewer
                             label="Comprobante de domicilio"
                             path={apoyo.comprobante_domicilio_path}
+                            url={documentoUrl('comprobante_domicilio')}
                         />
                     </CardContent>
                 </Card>
