@@ -29,6 +29,13 @@ use ZipArchive;
 
 class ApoyoController extends Controller
 {
+    /** Datos fijos del CFDI de un apoyo: 93161700 (Administración tributaria), unidad C62, comprobante de Egreso y PUE. */
+    private const CLAVE_PRODUCTO = '93161700';
+
+    private const CLAVE_UNIDAD = 'C62';
+
+    private const CFDI_APOYO = ['type' => 'E', 'payment_method' => 'PUE'];
+
     public function index(Request $request): Response
     {
         $apoyos = $this->visibleApoyos($request)
@@ -239,8 +246,8 @@ class ApoyoController extends Controller
         ]);
 
         $invoice = $invoiceService->generate(null, $customer, $this->itemsFromDetalles($apoyo), [
+            ...self::CFDI_APOYO,
             'payment_form' => $data['payment_form'],
-            'payment_method' => $data['payment_method'],
             'use' => $data['use'],
             ...ImpuestosFactura::desde($request, ivaPorDefecto: false),
         ]);
@@ -262,8 +269,6 @@ class ApoyoController extends Controller
     {
         $data = $request->validate([
             'payment_form' => ['required', 'string', 'max:2'],
-            'payment_method' => ['required', 'in:PUE,PPD'],
-            'use' => ['required', 'string', 'max:4'],
             ...ImpuestosFactura::reglas(),
         ]);
 
@@ -290,16 +295,10 @@ class ApoyoController extends Controller
                     'zip' => '01000',
                 ]);
 
-            if (! UsoCfdi::permitido($data['use'], $customer->tax_system)) {
-                $fallidos++;
-
-                continue;
-            }
-
             $invoice = $invoiceService->generate(null, $customer, $this->itemsFromDetalles($apoyo), [
+                ...self::CFDI_APOYO,
                 'payment_form' => $data['payment_form'],
-                'payment_method' => $data['payment_method'],
-                'use' => $data['use'],
+                'use' => self::usoParaRegimen($customer->tax_system),
                 ...$impuestos,
             ]);
 
@@ -336,10 +335,15 @@ class ApoyoController extends Controller
             'zip' => ['required', 'string', 'max:5'],
             'email' => ['nullable', 'email'],
             'payment_form' => ['required', 'string', 'max:2'],
-            'payment_method' => ['required', 'in:PUE,PPD'],
             'use' => ['required', 'string', 'max:4'],
             ...ImpuestosFactura::reglas(),
         ];
+    }
+
+    /** Gastos en general cuando el régimen del receptor lo admite; si no (616, público en general), Sin efectos fiscales. */
+    protected static function usoParaRegimen(string $regimen): string
+    {
+        return UsoCfdi::permitido('G03', $regimen) ? 'G03' : 'S01';
     }
 
     /**
@@ -349,8 +353,8 @@ class ApoyoController extends Controller
     {
         return array_values($apoyo->detalles->map(fn (DetalleApoyo $detalle) => [
             'description' => $detalle->articulo,
-            'sat_product_key' => '84111506',
-            'sat_unit_key' => 'E48',
+            'sat_product_key' => self::CLAVE_PRODUCTO,
+            'sat_unit_key' => self::CLAVE_UNIDAD,
             'quantity' => (float) $detalle->cantidad,
             'unit_price' => (float) $detalle->costo_unidad,
         ])->all());

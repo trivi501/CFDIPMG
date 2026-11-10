@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\Apoyo;
 use App\Models\ArticuloFacturaCompra;
 use App\Models\Beneficiario;
+use App\Models\Customer;
 use App\Models\FacturaCompra;
 use App\Models\Invoice;
 use App\Models\PersonaApoya;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -468,5 +470,62 @@ class ApoyoTest extends TestCase
         $this->assertSame('facturado', $apoyo->estatus);
         $this->assertNotNull($apoyo->invoice_id);
         $this->assertDatabaseHas('customers', ['rfc' => 'XAXX010101000']);
+    }
+
+    /** @return list<array<string, mixed>> */
+    protected function facturasEnviadas(): array
+    {
+        return Http::recorded(fn (HttpRequest $request) => str_ends_with($request->url(), '/v2/invoices'))
+            ->map(fn (array $par) => $par[0]->data())
+            ->values()
+            ->all();
+    }
+
+    public function test_un_apoyo_se_factura_como_egreso_pue_con_clave_93161700_y_unidad_c62(): void
+    {
+        $admin = $this->adminUser();
+        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
+        $apoyo = Apoyo::firstOrFail();
+        $apoyo->update(['estatus' => 'aprobado']);
+
+        $this->fakeFacturapi();
+
+        $this->actingAs($admin)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload([
+            'rfc' => 'PEJU800101AB1',
+            'legal_name' => 'Juan Pérez',
+            'tax_system' => '612',
+            'use' => 'G03',
+            'payment_method' => 'PPD',
+        ]))->assertSessionHasNoErrors()->assertRedirect();
+
+        [$factura] = $this->facturasEnviadas();
+        $this->assertSame('E', $factura['type']);
+        $this->assertSame('PUE', $factura['payment_method']);
+        $this->assertSame('G03', $factura['use']);
+        foreach ($factura['items'] as $item) {
+            $this->assertSame('93161700', $item['product']['product_key']);
+            $this->assertSame('C62', $item['product']['unit_key']);
+        }
+    }
+
+    public function test_facturar_todo_usa_g03_si_el_regimen_lo_permite_y_s01_si_no(): void
+    {
+        $admin = $this->adminUser();
+        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
+        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
+        [$conRfc, $sinRfc] = Apoyo::orderBy('id')->get()->all();
+        $conRfc->update(['estatus' => 'aprobado', 'rfc' => 'PEJU800101AB1']);
+        $sinRfc->update(['estatus' => 'aprobado']);
+        Customer::create(['rfc' => 'PEJU800101AB1', 'legal_name' => 'Juan Pérez', 'tax_system' => '612', 'zip' => '98600']);
+
+        $this->fakeFacturapi();
+
+        $this->actingAs($admin)->post('/apoyos/facturar-todo', ['payment_form' => '03'])
+            ->assertSessionHasNoErrors()->assertRedirect();
+
+        $usos = collect($this->facturasEnviadas())->pluck('use')->sort()->values()->all();
+        $this->assertSame(['G03', 'S01'], $usos);
+        $this->assertSame(['E'], collect($this->facturasEnviadas())->pluck('type')->unique()->values()->all());
+        $this->assertSame(2, Apoyo::where('estatus', 'facturado')->count());
     }
 }

@@ -19,7 +19,6 @@ import {
 import { usePermissions } from '@/hooks/use-permissions';
 import {
     PAYMENT_FORMS,
-    PAYMENT_METHODS,
     pickUseForRegime,
     TAX_SYSTEMS,
     usesForRegime,
@@ -171,7 +170,6 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
         zip: '01000',
         email: '',
         payment_form: '01',
-        payment_method: 'PUE',
         use: pickUseForRegime('G03', '616'),
         iva: false,
         isr_rate: '',
@@ -489,7 +487,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                                 ...facturarForm.data,
                                                 tax_system: e.target.value,
                                                 use: pickUseForRegime(
-                                                    facturarForm.data.use,
+                                                    'G03',
                                                     e.target.value,
                                                 ),
                                             })
@@ -601,35 +599,10 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                         }
                                     />
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="payment_method">
-                                        Método de pago
-                                    </Label>
-                                    <NativeSelect
-                                        id="payment_method"
-                                        value={facturarForm.data.payment_method}
-                                        onChange={(e) =>
-                                            facturarForm.setData(
-                                                'payment_method',
-                                                e.target.value,
-                                            )
-                                        }
-                                    >
-                                        {PAYMENT_METHODS.map((option) => (
-                                            <option
-                                                key={option.value}
-                                                value={option.value}
-                                            >
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </NativeSelect>
-                                    <InputError
-                                        message={
-                                            facturarForm.errors.payment_method
-                                        }
-                                    />
-                                </div>
+                                <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-4">
+                                    Comprobante de Egreso, método de pago PUE,
+                                    clave de producto 93161700 y unidad C62.
+                                </p>
                                 <div className="sm:col-span-2 lg:col-span-4">
                                     <ImpuestosFields
                                         data={facturarForm.data}

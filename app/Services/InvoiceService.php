@@ -19,7 +19,7 @@ class InvoiceService
      * $receipt for an "open" invoice with no underlying registered payment.
      *
      * @param  list<array{description: string, sat_product_key: string, sat_unit_key: string, quantity: float, unit_price: float}>  $items
-     * @param  array{payment_form: string, payment_method: string, use: string, iva?: bool, isr_rate?: float|null}  $cfdi
+     * @param  array{payment_form: string, payment_method: string, use: string, type?: 'I'|'E', iva?: bool, isr_rate?: float|null}  $cfdi
      */
     public function generate(?PaymentReceipt $receipt, Customer $customer, array $items, array $cfdi): Invoice
     {
@@ -50,6 +50,7 @@ class InvoiceService
                         ...$impuestos,
                     ],
                 ])->all(),
+                'type' => $cfdi['type'] ?? 'I',
                 'payment_form' => $cfdi['payment_form'],
                 'payment_method' => $cfdi['payment_method'],
                 'use' => $cfdi['use'],

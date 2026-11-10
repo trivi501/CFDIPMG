@@ -27,12 +27,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
-import {
-    CFDI_USES,
-    PAYMENT_FORMS,
-    PAYMENT_METHODS,
-    UNIVERSAL_USE,
-} from '@/lib/sat-catalogs';
+import { PAYMENT_FORMS } from '@/lib/sat-catalogs';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
 
@@ -96,8 +91,6 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
     const [facturarTodoOpen, setFacturarTodoOpen] = useState(false);
     const facturarTodoForm = useForm({
         payment_form: '01',
-        payment_method: 'PUE',
-        use: UNIVERSAL_USE,
         iva: false,
         isr_rate: '',
     });
@@ -323,34 +316,12 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                             Se generará una factura real para cada apoyo
                             aprobado visible, usando el RFC capturado en cada
                             uno (o "Público en general" si no tiene) con estos
-                            mismos datos fiscales. Como cada cliente puede tener
-                            otro régimen, aquí solo se ofrece el uso válido para
-                            todos.
+                            mismos datos fiscales. Se factura como Egreso, PUE,
+                            clave 93161700 y unidad C62, con uso G03 (Gastos en
+                            general) cuando el régimen del cliente lo permite y
+                            S01 (Sin efectos fiscales) cuando no, como en
+                            Público en general.
                         </p>
-                        <div className="grid gap-2">
-                            <Label htmlFor="bulk_use">Uso CFDI</Label>
-                            <NativeSelect
-                                id="bulk_use"
-                                value={facturarTodoForm.data.use}
-                                onChange={(e) =>
-                                    facturarTodoForm.setData(
-                                        'use',
-                                        e.target.value,
-                                    )
-                                }
-                            >
-                                {CFDI_USES.filter(
-                                    (option) => option.value === UNIVERSAL_USE,
-                                ).map((option) => (
-                                    <option
-                                        key={option.value}
-                                        value={option.value}
-                                    >
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </NativeSelect>
-                        </div>
                         <div className="grid gap-2">
                             <Label htmlFor="bulk_payment_form">
                                 Forma de pago
@@ -366,30 +337,6 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                                 }
                             >
                                 {PAYMENT_FORMS.map((option) => (
-                                    <option
-                                        key={option.value}
-                                        value={option.value}
-                                    >
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </NativeSelect>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="bulk_payment_method">
-                                Método de pago
-                            </Label>
-                            <NativeSelect
-                                id="bulk_payment_method"
-                                value={facturarTodoForm.data.payment_method}
-                                onChange={(e) =>
-                                    facturarTodoForm.setData(
-                                        'payment_method',
-                                        e.target.value,
-                                    )
-                                }
-                            >
-                                {PAYMENT_METHODS.map((option) => (
                                     <option
                                         key={option.value}
                                         value={option.value}
