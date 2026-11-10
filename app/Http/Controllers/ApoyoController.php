@@ -11,6 +11,7 @@ use App\Models\FacturaCompra;
 use App\Models\Paquete;
 use App\Models\PersonaApoya;
 use App\Services\InvoiceService;
+use App\Support\ImpuestosFactura;
 use App\Support\UsoCfdi;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -31,7 +32,7 @@ class ApoyoController extends Controller
     public function index(Request $request): Response
     {
         $apoyos = $this->visibleApoyos($request)
-            ->with('beneficiario', 'personaApoya')
+            ->with('beneficiario', 'personaApoya', 'area:id,nombre')
             ->when($request->filled('estatus'), fn (Builder $query) => $query->where('estatus', $request->string('estatus')))
             ->latest('fecha')
             ->paginate(15)
@@ -65,6 +66,7 @@ class ApoyoController extends Controller
                 'beneficiario_id' => $data['beneficiario_id'],
                 'persona_apoya_id' => $data['persona_apoya_id'],
                 'user_id' => $request->user()->id,
+                'area_id' => $request->user()->area_id,
                 'estatus' => Apoyo::ESTATUS_PREPARADO,
                 'curp' => $data['curp'] ?? null,
                 'rfc' => $data['rfc'] ?? null,
@@ -89,7 +91,7 @@ class ApoyoController extends Controller
     {
         $this->authorizeAccess($request, $apoyo);
 
-        $apoyo->load('detalles', 'beneficiario', 'personaApoya', 'user', 'invoice');
+        $apoyo->load('detalles', 'beneficiario', 'personaApoya', 'user', 'invoice', 'area');
 
         return Inertia::render('apoyos/show', [
             'apoyo' => $apoyo,
@@ -240,6 +242,7 @@ class ApoyoController extends Controller
             'payment_form' => $data['payment_form'],
             'payment_method' => $data['payment_method'],
             'use' => $data['use'],
+            ...ImpuestosFactura::desde($request, ivaPorDefecto: false),
         ]);
 
         if ($invoice->status === 'failed') {
@@ -261,7 +264,10 @@ class ApoyoController extends Controller
             'payment_form' => ['required', 'string', 'max:2'],
             'payment_method' => ['required', 'in:PUE,PPD'],
             'use' => ['required', 'string', 'max:4'],
+            ...ImpuestosFactura::reglas(),
         ]);
+
+        $impuestos = ImpuestosFactura::desde($request, ivaPorDefecto: false);
 
         $apoyos = $this->visibleApoyos($request)
             ->where('estatus', Apoyo::ESTATUS_APROBADO)
@@ -294,6 +300,7 @@ class ApoyoController extends Controller
                 'payment_form' => $data['payment_form'],
                 'payment_method' => $data['payment_method'],
                 'use' => $data['use'],
+                ...$impuestos,
             ]);
 
             if ($invoice->status === 'failed') {
@@ -331,6 +338,7 @@ class ApoyoController extends Controller
             'payment_form' => ['required', 'string', 'max:2'],
             'payment_method' => ['required', 'in:PUE,PPD'],
             'use' => ['required', 'string', 'max:4'],
+            ...ImpuestosFactura::reglas(),
         ];
     }
 
@@ -385,21 +393,35 @@ class ApoyoController extends Controller
     }
 
     /**
+     * Cada usuario ve los apoyos de su área (secretaría o regiduría) y los que él registró.
+     *
      * @return Builder<Apoyo>
      */
     protected function visibleApoyos(Request $request): Builder
     {
-        if ($request->user()->can('apoyos.view-all')) {
+        $user = $request->user();
+
+        if ($user->can('apoyos.view-all')) {
             return Apoyo::query();
         }
 
-        return Apoyo::where('user_id', $request->user()->id);
+        return Apoyo::where(function (Builder $query) use ($user) {
+            $query->where('user_id', $user->id);
+
+            if ($user->area_id !== null) {
+                $query->orWhere('area_id', $user->area_id);
+            }
+        });
     }
 
     protected function authorizeAccess(Request $request, Apoyo $apoyo): void
     {
+        $user = $request->user();
+
         abort_unless(
-            $request->user()->can('apoyos.view-all') || $apoyo->user_id === $request->user()->id,
+            $user->can('apoyos.view-all')
+                || $apoyo->user_id === $user->id
+                || ($user->area_id !== null && $apoyo->area_id === $user->area_id),
             403
         );
     }

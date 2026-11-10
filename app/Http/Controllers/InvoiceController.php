@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\Product;
 use App\Services\Facturapi\FacturapiClient;
 use App\Services\InvoiceService;
+use App\Support\ImpuestosFactura;
 use App\Support\UsoCfdi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,6 +56,7 @@ class InvoiceController extends Controller
             'payment_form' => ['required', 'string', 'max:2'],
             'payment_method' => ['required', 'in:PUE,PPD'],
             'use' => ['required', 'string', 'max:4'],
+            ...ImpuestosFactura::reglas(),
         ]);
 
         $customer = Customer::query()->where('id', $data['customer_id'])->firstOrFail();
@@ -65,6 +67,7 @@ class InvoiceController extends Controller
             'payment_form' => $data['payment_form'],
             'payment_method' => $data['payment_method'],
             'use' => $data['use'],
+            ...ImpuestosFactura::desde($request, ivaPorDefecto: true),
         ]);
 
         if ($invoice->status === 'failed') {

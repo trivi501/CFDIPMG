@@ -19,15 +19,19 @@ class InvoiceService
      * $receipt for an "open" invoice with no underlying registered payment.
      *
      * @param  list<array{description: string, sat_product_key: string, sat_unit_key: string, quantity: float, unit_price: float}>  $items
-     * @param  array{payment_form: string, payment_method: string, use: string}  $cfdi
+     * @param  array{payment_form: string, payment_method: string, use: string, iva?: bool, isr_rate?: float|null}  $cfdi
      */
     public function generate(?PaymentReceipt $receipt, Customer $customer, array $items, array $cfdi): Invoice
     {
         $total = collect($items)->sum(fn (array $item) => $item['quantity'] * $item['unit_price']);
 
+        $conIva = $cfdi['iva'] ?? true;
+
         // Payments pulled from the municipal Pagos system (predial) already have IVA
         // baked into their amount, unlike manually-priced items elsewhere in the app.
-        $taxIncluded = $receipt?->source_system === PaymentReceipt::SOURCE_PAGOS_MUNICIPALES;
+        $taxIncluded = $conIva && $receipt?->source_system === PaymentReceipt::SOURCE_PAGOS_MUNICIPALES;
+
+        $impuestos = $this->impuestos($conIva, $cfdi['isr_rate'] ?? null);
 
         try {
             $facturapiCustomerId = $customer->facturapi_customer_id
@@ -43,9 +47,7 @@ class InvoiceService
                         'unit_key' => $item['sat_unit_key'],
                         'price' => $item['unit_price'],
                         'tax_included' => $taxIncluded,
-                        'taxes' => [
-                            ['type' => 'IVA', 'rate' => 0.16, 'factor' => 'Tasa'],
-                        ],
+                        ...$impuestos,
                     ],
                 ])->all(),
                 'payment_form' => $cfdi['payment_form'],
@@ -180,6 +182,27 @@ class InvoiceService
                 'period_year' => $year,
             ]);
         }
+    }
+
+    /**
+     * Impuestos de cada concepto. Sin IVA ni ISR el concepto va como "No objeto de impuesto"
+     * (ObjetoImp 01) y sin arreglo de impuestos, que es como Facturapi documenta ese caso.
+     *
+     * @return array{taxability: string, taxes?: list<array<string, mixed>>}
+     */
+    protected function impuestos(bool $conIva, ?float $isrRate): array
+    {
+        $taxes = [];
+
+        if ($conIva) {
+            $taxes[] = ['type' => 'IVA', 'rate' => 0.16, 'factor' => 'Tasa'];
+        }
+
+        if ($isrRate !== null && $isrRate > 0) {
+            $taxes[] = ['type' => 'ISR', 'rate' => $isrRate, 'factor' => 'Tasa', 'withholding' => true];
+        }
+
+        return $taxes === [] ? ['taxability' => '01'] : ['taxability' => '02', 'taxes' => $taxes];
     }
 
     protected function syncCustomerToFacturapi(Customer $customer): string

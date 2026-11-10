@@ -1,6 +1,10 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
 import Heading from '@/components/heading';
+import {
+    calcularImpuestos,
+    ImpuestosFields,
+} from '@/components/impuestos-fields';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -154,6 +158,8 @@ export default function ReceiptInvoice({
         payment_form: suggestedPaymentForm ?? '03',
         payment_method: 'PUE',
         use: pickUseForRegime('G03', regimeOf(initialCustomerId)),
+        iva: false,
+        isr_rate: '',
         items: [emptyItem(receipt)] as Item[],
     });
 
@@ -208,6 +214,9 @@ export default function ReceiptInvoice({
         style: 'currency',
         currency: 'MXN',
     });
+
+    const ivaIncluido = taxIncludedInPrice && data.iva;
+    const resumen = calcularImpuestos(total, data, ivaIncluido);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -334,6 +343,16 @@ export default function ReceiptInvoice({
                                     ))}
                                 </NativeSelect>
                                 <InputError message={errors.use} />
+                            </div>
+
+                            <div className="sm:col-span-3">
+                                <ImpuestosFields
+                                    data={data}
+                                    onChange={(impuestos) =>
+                                        setData({ ...data, ...impuestos })
+                                    }
+                                    errors={errors}
+                                />
                             </div>
                         </CardContent>
                     </Card>
@@ -605,7 +624,7 @@ export default function ReceiptInvoice({
                                         </div>
                                         <div className="grid gap-2">
                                             <Label>
-                                                {taxIncludedInPrice
+                                                {ivaIncluido
                                                     ? 'Precio unitario (IVA incluido)'
                                                     : 'Precio unitario (sin IVA)'}
                                             </Label>
@@ -628,33 +647,16 @@ export default function ReceiptInvoice({
                             ))}
 
                             <div className="text-right text-sm">
-                                {taxIncludedInPrice ? (
-                                    <>
-                                        <p className="text-muted-foreground">
-                                            Base gravable:{' '}
-                                            {currency.format(total / 1.16)} ·
-                                            IVA incluido (16%):{' '}
-                                            {currency.format(
-                                                total - total / 1.16,
-                                            )}
-                                        </p>
-                                        <p className="text-lg font-semibold">
-                                            Total: {currency.format(total)}
-                                        </p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <p className="text-muted-foreground">
-                                            Subtotal: {currency.format(total)} ·
-                                            IVA (16%):{' '}
-                                            {currency.format(total * 0.16)}
-                                        </p>
-                                        <p className="text-lg font-semibold">
-                                            Total:{' '}
-                                            {currency.format(total * 1.16)}
-                                        </p>
-                                    </>
-                                )}
+                                <p className="text-muted-foreground">
+                                    Subtotal:{' '}
+                                    {currency.format(resumen.subtotal)} · IVA
+                                    {ivaIncluido ? ' incluido' : ''}:{' '}
+                                    {currency.format(resumen.iva)} · ISR
+                                    retenido: {currency.format(resumen.isr)}
+                                </p>
+                                <p className="text-lg font-semibold">
+                                    Total: {currency.format(resumen.total)}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>

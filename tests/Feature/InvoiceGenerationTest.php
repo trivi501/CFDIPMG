@@ -177,7 +177,7 @@ class InvoiceGenerationTest extends TestCase
             && $request['items'][0]['product']['tax_included'] === false);
     }
 
-    public function test_it_sends_prices_as_tax_included_for_pagos_municipales_receipts(): void
+    public function test_pagos_municipales_receipts_send_prices_as_tax_included_when_iva_is_chosen(): void
     {
         Http::fake([
             'www.facturapi.io/v2/customers' => Http::response(['id' => 'fact_cus_123'], 201),
@@ -202,7 +202,7 @@ class InvoiceGenerationTest extends TestCase
         ]);
 
         $this->actingAs($this->billingUser())
-            ->post("/receipts/{$receipt->id}/invoice", $this->invoiceFormPayload($customer));
+            ->post("/receipts/{$receipt->id}/invoice", [...$this->invoiceFormPayload($customer), 'iva' => true]);
 
         Http::assertSent(fn ($request) => $request->url() === 'https://www.facturapi.io/v2/invoices'
             && $request['items'][0]['product']['tax_included'] === true);

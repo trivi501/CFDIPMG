@@ -1,6 +1,10 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
 import Heading from '@/components/heading';
+import {
+    calcularImpuestos,
+    ImpuestosFields,
+} from '@/components/impuestos-fields';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,6 +65,8 @@ export default function InvoiceCreate({
         payment_form: '03',
         payment_method: 'PUE',
         use: '',
+        iva: true,
+        isr_rate: '',
         items: [emptyItem()] as Item[],
     });
 
@@ -118,6 +124,8 @@ export default function InvoiceCreate({
         style: 'currency',
         currency: 'MXN',
     });
+
+    const resumen = calcularImpuestos(total, data);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -242,6 +250,16 @@ export default function InvoiceCreate({
                                     ))}
                                 </NativeSelect>
                                 <InputError message={errors.use} />
+                            </div>
+
+                            <div className="sm:col-span-3">
+                                <ImpuestosFields
+                                    data={data}
+                                    onChange={(impuestos) =>
+                                        setData({ ...data, ...impuestos })
+                                    }
+                                    errors={errors}
+                                />
                             </div>
                         </CardContent>
                     </Card>
@@ -387,11 +405,13 @@ export default function InvoiceCreate({
 
                             <div className="text-right text-sm">
                                 <p className="text-muted-foreground">
-                                    Subtotal: {currency.format(total)} · IVA
-                                    (16%): {currency.format(total * 0.16)}
+                                    Subtotal:{' '}
+                                    {currency.format(resumen.subtotal)} · IVA:{' '}
+                                    {currency.format(resumen.iva)} · ISR
+                                    retenido: {currency.format(resumen.isr)}
                                 </p>
                                 <p className="text-lg font-semibold">
-                                    Total: {currency.format(total * 1.16)}
+                                    Total: {currency.format(resumen.total)}
                                 </p>
                             </div>
                         </CardContent>

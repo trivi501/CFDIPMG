@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\PaymentReceipt;
 use App\Models\Product;
 use App\Services\InvoiceService;
+use App\Support\ImpuestosFactura;
 use App\Support\UsoCfdi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -101,6 +102,7 @@ class ReceiptController extends Controller
             'payment_form' => ['required', 'string', 'max:2'],
             'payment_method' => ['required', 'in:PUE,PPD'],
             'use' => ['required', 'string', 'max:4'],
+            ...ImpuestosFactura::reglas(),
         ]);
 
         if ($receipt->status === 'invoiced') {
@@ -113,10 +115,12 @@ class ReceiptController extends Controller
 
         UsoCfdi::validar($data['use'], $customer->tax_system);
 
+        // Los recibos que llegan por API son cobros del municipio: sin IVA salvo que se elija.
         $invoice = $invoiceService->generate($receipt, $customer, $data['items'], [
             'payment_form' => $data['payment_form'],
             'payment_method' => $data['payment_method'],
             'use' => $data['use'],
+            ...ImpuestosFactura::desde($request, ivaPorDefecto: false),
         ]);
 
         if ($invoice->status === 'failed') {

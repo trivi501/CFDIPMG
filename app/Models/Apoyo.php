@@ -21,6 +21,7 @@ class Apoyo extends Model
         'beneficiario_id',
         'persona_apoya_id',
         'user_id',
+        'area_id',
         'estatus',
         'invoice_id',
         'sub_total',
@@ -67,6 +68,14 @@ class Apoyo extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<Area, $this>
+     */
+    public function area(): BelongsTo
+    {
+        return $this->belongsTo(Area::class);
     }
 
     /**

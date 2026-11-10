@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ApiClientController;
 use App\Http\Controllers\ApoyoController;
+use App\Http\Controllers\AreaController;
 use App\Http\Controllers\BeneficiarioController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -116,6 +117,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('permission:users.manage')->group(function () {
         Route::resource('users', UserController::class)->except(['show']);
+        Route::resource('areas', AreaController::class)->except(['show']);
     });
 
     Route::middleware('permission:roles.manage')->group(function () {

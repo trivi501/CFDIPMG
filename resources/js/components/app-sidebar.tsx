@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import {
     Boxes,
+    Building2,
     FileCheck2,
     FileText,
     HandCoins,
@@ -30,6 +31,7 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { dashboard } from '@/routes';
 import apiClients from '@/routes/api-clients';
 import apoyos from '@/routes/apoyos';
+import areas from '@/routes/areas';
 import beneficiarios from '@/routes/beneficiarios';
 import customers from '@/routes/customers';
 import facturasCompra from '@/routes/facturas-compra';
@@ -118,6 +120,11 @@ export function AppSidebar() {
             title: 'Usuarios',
             href: users.index(),
             icon: UserCog,
+        });
+        adminNavItems.push({
+            title: 'Áreas',
+            href: areas.index(),
+            icon: Building2,
         });
     }
 

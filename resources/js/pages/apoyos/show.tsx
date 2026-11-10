@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import Heading from '@/components/heading';
+import { ImpuestosFields } from '@/components/impuestos-fields';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -65,6 +66,7 @@ type Apoyo = {
     beneficiario: { nombre: string } | null;
     persona_apoya: { nombre: string } | null;
     user: { name: string } | null;
+    area: { nombre: string } | null;
     invoice: Invoice | null;
     detalles: ApoyoDetalle[];
 };
@@ -171,6 +173,8 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
         payment_form: '01',
         payment_method: 'PUE',
         use: pickUseForRegime('G03', '616'),
+        iva: false,
+        isr_rate: '',
     });
 
     const facturar = (e: React.FormEvent) => {
@@ -187,7 +191,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <Heading
                         title={`Apoyo de ${apoyo.beneficiario?.nombre ?? '—'}`}
-                        description={`Registrado por ${apoyo.user?.name ?? '—'} el ${apoyo.fecha}`}
+                        description={`Registrado por ${apoyo.user?.name ?? '—'}${apoyo.area ? ` (${apoyo.area.nombre})` : ''} el ${apoyo.fecha}`}
                     />
                     <div className="flex flex-wrap gap-2">
                         {apoyo.estatus === 'preparado' &&
@@ -624,6 +628,18 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                         message={
                                             facturarForm.errors.payment_method
                                         }
+                                    />
+                                </div>
+                                <div className="sm:col-span-2 lg:col-span-4">
+                                    <ImpuestosFields
+                                        data={facturarForm.data}
+                                        onChange={(impuestos) =>
+                                            facturarForm.setData({
+                                                ...facturarForm.data,
+                                                ...impuestos,
+                                            })
+                                        }
+                                        errors={facturarForm.errors}
                                     />
                                 </div>
                                 <div className="sm:col-span-2 lg:col-span-4">

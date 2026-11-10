@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button';
 import Heading from '@/components/heading';
+import { ImpuestosFields } from '@/components/impuestos-fields';
 import { Pagination } from '@/components/pagination';
 import type { Paginator } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +47,7 @@ type Apoyo = {
     estatus: Estatus;
     beneficiario: { nombre: string } | null;
     persona_apoya: { nombre: string } | null;
+    area: { nombre: string } | null;
 };
 
 type PageProps = {
@@ -96,6 +98,8 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
         payment_form: '01',
         payment_method: 'PUE',
         use: UNIVERSAL_USE,
+        iva: false,
+        isr_rate: '',
     });
 
     const facturarTodo = (e: React.FormEvent) => {
@@ -183,6 +187,7 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                                 <TableHead>Fecha</TableHead>
                                 <TableHead>Beneficiario</TableHead>
                                 <TableHead>Persona Apoya</TableHead>
+                                <TableHead>Área</TableHead>
                                 <TableHead className="text-right">
                                     Sub Total
                                 </TableHead>
@@ -200,7 +205,7 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                         </TableHeader>
                         <TableBody>
                             {paginator.data.length === 0 && (
-                                <TableEmpty colSpan={8}>
+                                <TableEmpty colSpan={9}>
                                     No hay apoyos registrados.
                                 </TableEmpty>
                             )}
@@ -212,6 +217,9 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                                     </TableCell>
                                     <TableCell>
                                         {apoyo.persona_apoya?.nombre ?? '—'}
+                                    </TableCell>
+                                    <TableCell>
+                                        {apoyo.area?.nombre ?? '—'}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {currency.format(
@@ -391,6 +399,17 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                                 ))}
                             </NativeSelect>
                         </div>
+                        <ImpuestosFields
+                            idPrefix="bulk_"
+                            data={facturarTodoForm.data}
+                            onChange={(impuestos) =>
+                                facturarTodoForm.setData({
+                                    ...facturarTodoForm.data,
+                                    ...impuestos,
+                                })
+                            }
+                            errors={facturarTodoForm.errors}
+                        />
                         <DialogFooter>
                             <Button
                                 type="submit"

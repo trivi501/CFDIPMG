@@ -24,6 +24,8 @@ type User = {
     id: number;
     name: string;
     email: string;
+    titulo: string | null;
+    area: { nombre: string } | null;
     roles: { id: number; name: string }[];
 };
 
@@ -82,6 +84,7 @@ export default function UsersIndex({ users: paginator, filters }: PageProps) {
                             <TableRow>
                                 <TableHead>Nombre</TableHead>
                                 <TableHead>Email</TableHead>
+                                <TableHead>Área</TableHead>
                                 <TableHead>Roles</TableHead>
                                 <TableHead className="text-right">
                                     Acciones
@@ -90,7 +93,7 @@ export default function UsersIndex({ users: paginator, filters }: PageProps) {
                         </TableHeader>
                         <TableBody>
                             {paginator.data.length === 0 && (
-                                <TableEmpty colSpan={4}>
+                                <TableEmpty colSpan={5}>
                                     No hay usuarios.
                                 </TableEmpty>
                             )}
@@ -100,6 +103,18 @@ export default function UsersIndex({ users: paginator, filters }: PageProps) {
                                         {user.name}
                                     </TableCell>
                                     <TableCell>{user.email}</TableCell>
+                                    <TableCell>
+                                        {user.area?.nombre ?? (
+                                            <span className="text-muted-foreground">
+                                                Sin área
+                                            </span>
+                                        )}
+                                        {user.titulo && (
+                                            <span className="block text-xs text-muted-foreground">
+                                                {user.titulo}
+                                            </span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1">
                                             {user.roles.length === 0 && (

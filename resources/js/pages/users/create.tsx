@@ -6,10 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { UserAreaFields } from '@/components/user-area-fields';
+import type { AreaOpcion } from '@/lib/areas';
 import { dashboard } from '@/routes';
 import users from '@/routes/users';
 
-export default function UserCreate({ roles }: { roles: string[] }) {
+export default function UserCreate({
+    roles,
+    areas,
+}: {
+    roles: string[];
+    areas: AreaOpcion[];
+}) {
     return (
         <>
             <Head title="Nuevo usuario" />
@@ -53,6 +61,8 @@ export default function UserCreate({ roles }: { roles: string[] }) {
                                 />
                                 <InputError message={errors.password} />
                             </div>
+
+                            <UserAreaFields areas={areas} errors={errors} />
 
                             <div className="grid gap-2">
                                 <Label>Roles</Label>

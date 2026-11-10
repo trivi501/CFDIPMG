@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { UserAreaFields } from '@/components/user-area-fields';
+import type { AreaOpcion } from '@/lib/areas';
 import { dashboard } from '@/routes';
 import users from '@/routes/users';
 
@@ -13,15 +15,19 @@ type User = {
     id: number;
     name: string;
     email: string;
+    area_id: number | null;
+    titulo: string | null;
     roles: { id: number; name: string }[];
 };
 
 export default function UserEdit({
     user,
     roles,
+    areas,
 }: {
     user: User;
     roles: string[];
+    areas: AreaOpcion[];
 }) {
     const userRoleNames = user.roles.map((role) => role.name);
 
@@ -73,6 +79,13 @@ export default function UserEdit({
                                 />
                                 <InputError message={errors.password} />
                             </div>
+
+                            <UserAreaFields
+                                areas={areas}
+                                errors={errors}
+                                areaId={user.area_id}
+                                titulo={user.titulo}
+                            />
 
                             <div className="grid gap-2">
                                 <Label>Roles</Label>
