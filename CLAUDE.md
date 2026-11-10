@@ -90,6 +90,20 @@ escritura (`*.manage` / `*.create`). En el frontend, `HandleInertiaRequests` com
 expone `can()`/`hasRole()` para ocultar UI condicionalmente — eso es solo UX, la autorización real
 vive en el middleware.
 
+### Bitácora de auditoría
+
+`App\Support\RegistroAuditoria` (registrado en `AppServiceProvider`) escribe en la tabla `auditoria`
+sin tocar controladores: eventos de Eloquent de todos los modelos (alta, modificación y eliminación
+con valores antes/después), cualquier INSERT/UPDATE/DELETE que no venga de un modelo como "cambio
+masivo" con la instrucción, e inicios/cierres de sesión e intentos fallidos. Las descargas (PDF/XML
+de facturas, XML de compras, documentos de apoyos) las registra el middleware
+`RegistrarConsultaAuditoria` según su lista `RUTAS`: **al agregar una ruta que descargue o exporte,
+hay que añadirla ahí**. Contraseñas, tokens y atributos ocultos quedan como "[oculto]"; nunca
+interrumpe la operación (si falla, solo deja un warning en el log). Pantalla `/auditoria`, solo para
+el rol Admin (por rol, no por permiso, para que no se pueda otorgar). Al agregar una tabla nueva, su
+nombre legible va en `AuditoriaController::MODULOS`. La app guarda en UTC y la pantalla muestra y
+filtra en hora de Ciudad de México.
+
 ### Wayfinder (rutas/acciones tipadas)
 
 `resources/js/actions/**` y `resources/js/routes/**` están **gitignored** y se regeneran solos

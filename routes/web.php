@@ -3,6 +3,7 @@
 use App\Http\Controllers\ApiClientController;
 use App\Http\Controllers\ApoyoController;
 use App\Http\Controllers\AreaController;
+use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\BeneficiarioController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -123,6 +124,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('permission:roles.manage')->group(function () {
         Route::resource('roles', RoleController::class)->except(['show']);
     });
+
+    // Por rol y no por permiso: la bitácora no se puede otorgar a otros roles.
+    Route::get('auditoria', [AuditoriaController::class, 'index'])
+        ->middleware('role:Admin')
+        ->name('auditoria.index');
 
     Route::middleware('permission:api-clients.manage')->group(function () {
         Route::resource('api-clients', ApiClientController::class)->except(['show', 'edit']);

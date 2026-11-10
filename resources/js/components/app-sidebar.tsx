@@ -9,6 +9,7 @@ import {
     LayoutGrid,
     Package,
     Receipt,
+    ScrollText,
     ShieldCheck,
     UserCheck,
     UserCog,
@@ -32,6 +33,7 @@ import { dashboard } from '@/routes';
 import apiClients from '@/routes/api-clients';
 import apoyos from '@/routes/apoyos';
 import areas from '@/routes/areas';
+import auditoria from '@/routes/auditoria';
 import beneficiarios from '@/routes/beneficiarios';
 import customers from '@/routes/customers';
 import facturasCompra from '@/routes/facturas-compra';
@@ -45,7 +47,7 @@ import users from '@/routes/users';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
-    const { can } = usePermissions();
+    const { can, hasRole } = usePermissions();
 
     const mainNavItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
@@ -133,6 +135,14 @@ export function AppSidebar() {
             title: 'Roles y permisos',
             href: roles.index(),
             icon: ShieldCheck,
+        });
+    }
+
+    if (hasRole('Admin')) {
+        adminNavItems.push({
+            title: 'Bitácora de auditoría',
+            href: auditoria.index(),
+            icon: ScrollText,
         });
     }
 
