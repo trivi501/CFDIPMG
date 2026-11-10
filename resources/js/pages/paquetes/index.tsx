@@ -19,6 +19,7 @@ import paquetesRoutes from '@/routes/paquetes';
 
 type PaqueteConFactura = Paquete & {
     factura_compra: { emisor: string | null; fecha: string | null } | null;
+    disponibles: number;
 };
 
 export default function PaquetesIndex({
@@ -54,13 +55,16 @@ export default function PaquetesIndex({
                                 <TableHead>Factura</TableHead>
                                 <TableHead>Contenido</TableHead>
                                 <TableHead className="text-right">
+                                    Disponibles
+                                </TableHead>
+                                <TableHead className="text-right">
                                     Acciones
                                 </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {paquetes.length === 0 && (
-                                <TableEmpty colSpan={4}>
+                                <TableEmpty colSpan={5}>
                                     No hay paquetes registrados.
                                 </TableEmpty>
                             )}
@@ -81,6 +85,11 @@ export default function PaquetesIndex({
                                                     `${Number(a.cantidad)} × ${a.descripcion}`,
                                             )
                                             .join(', ')}
+                                    </TableCell>
+                                    <TableCell
+                                        className={`text-right font-medium tabular-nums ${paquete.disponibles === 0 ? 'text-destructive' : ''}`}
+                                    >
+                                        {paquete.disponibles}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {can('apoyos.manage') && (

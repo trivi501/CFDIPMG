@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Apoyo;
 use App\Models\ArticuloFacturaCompra;
+use App\Models\Beneficiario;
 use App\Models\FacturaCompra;
 use App\Models\Paquete;
+use App\Models\PersonaApoya;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -211,5 +214,43 @@ class PaqueteTest extends TestCase
                 ->where('paquetes.0.factura_compra_id', $factura->id)
                 ->where('paquetes.0.articulos.0.descripcion', 'SOPA')
         );
+    }
+
+    public function test_los_paquetes_disponibles_los_limita_el_articulo_mas_escaso_y_bajan_al_dar_de_alta_un_apoyo(): void
+    {
+        $factura = $this->factura();
+        $sopa = $this->articulo($factura, 'SOPA'); // 10 disponibles
+        $aceite = $this->articulo($factura, 'ACEITE'); // 10 disponibles
+        $aceite->update(['cantidad_disponible' => 7]);
+        $paquete = Paquete::create(['factura_compra_id' => $factura->id, 'nombre' => 'Despensa']);
+        $paquete->articulos()->create(['articulo_factura_compra_id' => $sopa->id, 'descripcion' => 'SOPA', 'cantidad' => 2]);
+        $paquete->articulos()->create(['articulo_factura_compra_id' => $aceite->id, 'descripcion' => 'ACEITE', 'cantidad' => 1]);
+        $usuario = $this->usuario();
+
+        // Sopa alcanza para 5 y aceite para 7: quedan 5 paquetes.
+        $this->actingAs($usuario)->get('/paquetes')
+            ->assertInertia(fn ($page) => $page->where('paquetes.0.disponibles', 5));
+
+        $this->actingAs($usuario)->post('/apoyos', [
+            'fecha' => '2026-11-10',
+            'beneficiario_id' => Beneficiario::create(['nombre' => 'Juan'])->id,
+            'persona_apoya_id' => PersonaApoya::create(['nombre' => 'María'])->id,
+            'detalles' => [
+                ['articulo_factura_compra_id' => $sopa->id, 'cantidad' => 4, 'articulo' => 'SOPA', 'costo_unidad' => 10, 'iva' => 0],
+                ['articulo_factura_compra_id' => $aceite->id, 'cantidad' => 2, 'articulo' => 'ACEITE', 'costo_unidad' => 10, 'iva' => 0],
+            ],
+        ])->assertSessionHasNoErrors()->assertRedirect();
+
+        $this->assertSame(3, $paquete->fresh()->disponibles());
+        $this->actingAs($usuario)->get('/paquetes')
+            ->assertInertia(fn ($page) => $page->where('paquetes.0.disponibles', 3));
+
+        // La lista de apoyos muestra la factura de compra de la que salieron los artículos.
+        $this->actingAs($usuario)->get('/apoyos')
+            ->assertInertia(fn ($page) => $page
+                ->where('apoyos.data.0.facturas_compra.0.id', $factura->id)
+                ->where('apoyos.data.0.facturas_compra.0.emisor', 'Proveedor')
+                ->missing('apoyos.data.0.detalles'));
+        $this->assertSame(1, Apoyo::count());
     }
 }

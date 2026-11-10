@@ -30,6 +30,7 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { PAYMENT_FORMS } from '@/lib/sat-catalogs';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
+import facturasCompra from '@/routes/facturas-compra';
 
 type Estatus = 'preparado' | 'aprobado' | 'facturado' | 'rechazado';
 
@@ -43,6 +44,11 @@ type Apoyo = {
     beneficiario: { nombre: string } | null;
     persona_apoya: { nombre: string } | null;
     area: { nombre: string } | null;
+    facturas_compra: {
+        id: number;
+        uuid: string | null;
+        emisor: string | null;
+    }[];
 };
 
 type PageProps = {
@@ -181,6 +187,7 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                                 <TableHead>Beneficiario</TableHead>
                                 <TableHead>Persona Apoya</TableHead>
                                 <TableHead>Área</TableHead>
+                                <TableHead>Factura de compra</TableHead>
                                 <TableHead className="text-right">
                                     Sub Total
                                 </TableHead>
@@ -198,7 +205,7 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                         </TableHeader>
                         <TableBody>
                             {paginator.data.length === 0 && (
-                                <TableEmpty colSpan={9}>
+                                <TableEmpty colSpan={10}>
                                     No hay apoyos registrados.
                                 </TableEmpty>
                             )}
@@ -213,6 +220,35 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                                     </TableCell>
                                     <TableCell>
                                         {apoyo.area?.nombre ?? '—'}
+                                    </TableCell>
+                                    <TableCell>
+                                        {apoyo.facturas_compra.length === 0
+                                            ? '—'
+                                            : apoyo.facturas_compra.map(
+                                                  (factura) => (
+                                                      <div key={factura.id}>
+                                                          {factura.emisor ??
+                                                              'Factura de compra'}
+                                                          {factura.uuid && (
+                                                              <a
+                                                                  href={
+                                                                      facturasCompra.xml(
+                                                                          factura.id,
+                                                                      ).url
+                                                                  }
+                                                                  title={`Descargar XML · ${factura.uuid}`}
+                                                                  className="block font-mono text-xs text-muted-foreground hover:underline"
+                                                              >
+                                                                  {factura.uuid.slice(
+                                                                      0,
+                                                                      8,
+                                                                  )}
+                                                                  …
+                                                              </a>
+                                                          )}
+                                                      </div>
+                                                  ),
+                                              )}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {currency.format(

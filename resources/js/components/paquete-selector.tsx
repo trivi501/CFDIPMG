@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { asignarPaquete } from '@/lib/paquetes';
+import { asignarPaquete, paquetesDisponibles } from '@/lib/paquetes';
 import type { FacturaStock, LineaPaquete, Paquete } from '@/lib/paquetes';
 
 export function PaqueteSelector<F extends FacturaStock>({
@@ -21,6 +21,9 @@ export function PaqueteSelector<F extends FacturaStock>({
     const [faltantes, setFaltantes] = useState<string[]>([]);
 
     const paquete = paquetes.find((p) => String(p.id) === paqueteId);
+    const disponibles = (p: Paquete) => paquetesDisponibles(p, facturas);
+    const textoDisponibles = (n: number) =>
+        n === 1 ? '1 disponible' : `${n} disponibles`;
 
     const agregar = () => {
         if (!paquete || Number(veces) <= 0) {
@@ -50,7 +53,7 @@ export function PaqueteSelector<F extends FacturaStock>({
                         id="paquete"
                         options={paquetes.map((p) => ({
                             value: String(p.id),
-                            label: p.nombre,
+                            label: `${p.nombre} · ${textoDisponibles(disponibles(p))}`,
                         }))}
                         value={paqueteId}
                         onChange={(value) => {
@@ -80,6 +83,14 @@ export function PaqueteSelector<F extends FacturaStock>({
                     <PackagePlus /> Agregar paquete
                 </Button>
             </div>
+
+            {paquete && (
+                <p className="text-sm font-medium">
+                    {disponibles(paquete) === 0
+                        ? 'No quedan paquetes disponibles con el inventario actual.'
+                        : `Quedan ${textoDisponibles(disponibles(paquete))} de este paquete.`}
+                </p>
+            )}
 
             {paquete && (
                 <p className="text-sm text-muted-foreground">

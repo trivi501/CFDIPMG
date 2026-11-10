@@ -17,8 +17,13 @@ class PaqueteController extends Controller
 {
     public function index(): Response
     {
+        $paquetes = Paquete::with('articulos.articuloFacturaCompra', 'facturaCompra')->orderBy('nombre')->get();
+
         return Inertia::render('paquetes/index', [
-            'paquetes' => Paquete::with('articulos', 'facturaCompra')->orderBy('nombre')->get(),
+            'paquetes' => $paquetes->map(fn (Paquete $paquete) => [
+                ...$paquete->toArray(),
+                'disponibles' => $paquete->disponibles(),
+            ]),
         ]);
     }
 

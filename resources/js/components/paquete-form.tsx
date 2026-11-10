@@ -16,6 +16,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { paquetesDisponibles } from '@/lib/paquetes';
 import type { ArticuloStock, Paquete } from '@/lib/paquetes';
 import paquetes from '@/routes/paquetes';
 
@@ -124,6 +125,17 @@ export function PaqueteForm({
             form.post(paquetes.store().url);
         }
     };
+
+    const disponibles =
+        form.data.factura_compra_id && form.data.articulos.length > 0
+            ? paquetesDisponibles(
+                  {
+                      factura_compra_id: Number(form.data.factura_compra_id),
+                      articulos: form.data.articulos,
+                  },
+                  facturas,
+              )
+            : null;
 
     const erroresDeArticulos = Object.entries(form.errors)
         .filter(([campo]) => campo.startsWith('articulos'))
@@ -275,6 +287,14 @@ export function PaqueteForm({
                             </TableBody>
                         </Table>
                     </div>
+
+                    {disponibles !== null && (
+                        <p className="text-sm font-medium">
+                            {disponibles === 0
+                                ? 'Con el inventario actual no alcanza para ningún paquete.'
+                                : `Con el inventario actual alcanzan ${disponibles} ${disponibles === 1 ? 'paquete' : 'paquetes'}.`}
+                        </p>
+                    )}
 
                     {erroresDeArticulos.map((mensaje) => (
                         <InputError key={mensaje} message={mensaje} />

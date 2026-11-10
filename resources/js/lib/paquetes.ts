@@ -33,6 +33,42 @@ export type LineaPaquete = {
 
 const redondear = (valor: number) => Math.round(valor * 100) / 100;
 
+/**
+ * Paquetes completos que alcanzan con el inventario: lo limita el artículo más escaso.
+ * Misma regla que Paquete::disponibles() en el backend.
+ */
+export function paquetesDisponibles(
+    paquete: {
+        factura_compra_id: number;
+        articulos: { articulo_factura_compra_id: number; cantidad: string }[];
+    },
+    facturas: FacturaStock[],
+): number {
+    if (paquete.articulos.length === 0) {
+        return 0;
+    }
+
+    const articulos =
+        facturas.find((f) => f.id === paquete.factura_compra_id)?.articulos ??
+        [];
+
+    return Math.min(
+        ...paquete.articulos.map((componente) => {
+            const porPaquete = Number(componente.cantidad);
+            const existencia = Number(
+                articulos.find(
+                    (a) => a.id === componente.articulo_factura_compra_id,
+                )?.cantidad_disponible ?? 0,
+            );
+
+            // El margen evita que 0.3 / 0.1 se redondee a 2 por el punto flotante.
+            return porPaquete > 0
+                ? Math.floor(existencia / porPaquete + 1e-9)
+                : Infinity;
+        }),
+    );
+}
+
 // Descuenta solo de la factura del paquete; si falta algún artículo no aparta nada.
 export function asignarPaquete<F extends FacturaStock>(
     paquete: Paquete,

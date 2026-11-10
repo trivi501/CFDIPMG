@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -39,11 +40,21 @@ class ApoyoController extends Controller
     public function index(Request $request): Response
     {
         $apoyos = $this->visibleApoyos($request)
-            ->with('beneficiario', 'personaApoya', 'area:id,nombre')
+            ->with('beneficiario', 'personaApoya', 'area:id,nombre', 'detalles.articuloFacturaCompra.facturaCompra:id,uuid,emisor,fecha')
             ->when($request->filled('estatus'), fn (Builder $query) => $query->where('estatus', $request->string('estatus')))
             ->latest('fecha')
             ->paginate(15)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (Apoyo $apoyo) => [
+                ...Arr::except($apoyo->toArray(), ['detalles']),
+                // Facturas de compra de las que salieron los artículos del apoyo.
+                'facturas_compra' => $apoyo->detalles
+                    ->map(fn (DetalleApoyo $detalle) => $detalle->articuloFacturaCompra?->facturaCompra)
+                    ->filter()
+                    ->unique('id')
+                    ->map(fn (FacturaCompra $factura) => $factura->only(['id', 'uuid', 'emisor']))
+                    ->values(),
+            ]);
 
         return Inertia::render('apoyos/index', [
             'apoyos' => $apoyos,
