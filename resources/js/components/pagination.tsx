@@ -17,7 +17,14 @@ export type Paginator<T> = {
     total: number;
 };
 
-export function Pagination({ paginator }: { paginator: Paginator<unknown> }) {
+export function Pagination({
+    paginator,
+    preserveState = false,
+}: {
+    paginator: Paginator<unknown>;
+    /** Conserva el estado de la página (p. ej. una selección) al cambiar de página. */
+    preserveState?: boolean;
+}) {
     if (paginator.last_page <= 1) {
         return null;
     }
@@ -35,6 +42,7 @@ export function Pagination({ paginator }: { paginator: Paginator<unknown> }) {
                         key={index}
                         href={link.url ?? '#'}
                         preserveScroll
+                        preserveState={preserveState}
                         className={cn(
                             'rounded-md border px-3 py-1.5 text-sm transition-colors',
                             link.active

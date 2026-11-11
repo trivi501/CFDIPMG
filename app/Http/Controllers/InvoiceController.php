@@ -12,23 +12,92 @@ use App\Support\UsoCfdi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
+use ZipArchive;
 
 class InvoiceController extends Controller
 {
+    /** Tope de facturas por ZIP: cada XML es una petición a Facturapi. */
+    public const MAX_XMLS = 200;
+
     public function index(Request $request): Response
     {
-        $invoices = Invoice::with('customer')
+        $invoices = Invoice::with('customer:id,legal_name,rfc')
             ->when($request->string('status')->toString(), fn ($query, $status) => $query->where('status', $status))
+            ->when($request->string('search')->trim()->toString(), function ($query, $search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('uuid', 'like', "%{$search}%")
+                        ->orWhere('folio', 'like', "%{$search}%")
+                        ->orWhere('series', 'like', "%{$search}%")
+                        ->orWhereHas('customer', fn ($query) => $query
+                            ->where('legal_name', 'like', "%{$search}%")
+                            ->orWhere('rfc', 'like', "%{$search}%"));
+                });
+            })
             ->latest('issued_at')
             ->paginate(15)
             ->withQueryString();
 
         return Inertia::render('invoices/index', [
             'invoices' => $invoices,
-            'filters' => $request->only('status'),
+            'filters' => $request->only('status', 'search'),
+            'maxXmls' => self::MAX_XMLS,
         ]);
+    }
+
+    /**
+     * ZIP con los XML de las facturas marcadas en la lista. Las que no están timbradas (fallidas)
+     * se omiten, y si Facturapi no entrega alguna se anota en ERRORES.txt en vez de abortar todo.
+     */
+    public function xmls(Request $request, FacturapiClient $facturapi): BinaryFileResponse|HttpResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:'.self::MAX_XMLS],
+            'ids.*' => ['integer'],
+        ]);
+
+        $invoices = Invoice::whereIn('id', $data['ids'])
+            ->whereNotNull('facturapi_invoice_id')
+            ->whereNotNull('uuid')
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return response('Ninguna de las facturas seleccionadas tiene XML (solo las timbradas lo tienen).', 404);
+        }
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'facturas-xml');
+
+        if ($zipPath === false) {
+            abort(500, 'No se pudo preparar el archivo ZIP.');
+        }
+
+        $zip = new ZipArchive;
+        $zip->open($zipPath, ZipArchive::OVERWRITE);
+        $errores = [];
+
+        foreach ($invoices as $invoice) {
+            $nombre = trim(($invoice->series ?? '').($invoice->folio ?? '').'-'.$invoice->uuid, '-').'.xml';
+
+            try {
+                $zip->addFromString($nombre, $facturapi->downloadXml((string) $invoice->facturapi_invoice_id)->body());
+            } catch (Throwable $e) {
+                Log::warning('No se pudo descargar el XML de la factura', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+                $errores[] = "{$nombre}: {$e->getMessage()}";
+            }
+        }
+
+        if ($errores !== []) {
+            $zip->addFromString('ERRORES.txt', "No se pudieron descargar estos XML:\n\n".implode("\n", $errores)."\n");
+        }
+
+        $zip->close();
+
+        return response()->download($zipPath, 'facturas-xml-'.now('America/Mexico_City')->format('Y-m-d').'.zip')
+            ->deleteFileAfterSend();
     }
 
     /**

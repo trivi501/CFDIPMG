@@ -59,6 +59,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('invoices', [InvoiceController::class, 'store'])
             ->middleware('permission:invoices.create')
             ->name('invoices.store');
+        Route::get('invoices/xmls', [InvoiceController::class, 'xmls'])
+            ->middleware('permission:invoices.download')
+            ->name('invoices.xmls');
         Route::get('invoices/global', [GlobalInvoiceController::class, 'create'])
             ->middleware('permission:invoices.create')
             ->name('invoices.global.create');
