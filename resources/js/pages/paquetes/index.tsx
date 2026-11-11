@@ -13,6 +13,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
+import { fechaMx } from '@/lib/fechas';
 import type { Paquete } from '@/lib/paquetes';
 import { dashboard } from '@/routes';
 import paquetesRoutes from '@/routes/paquetes';
@@ -76,7 +77,7 @@ export default function PaquetesIndex({
                                     <TableCell>
                                         {paquete.factura_compra?.emisor ?? '—'}
                                         {paquete.factura_compra?.fecha &&
-                                            ` · ${paquete.factura_compra.fecha.slice(0, 10)}`}
+                                            ` · ${fechaMx(paquete.factura_compra.fecha)}`}
                                     </TableCell>
                                     <TableCell className="whitespace-normal">
                                         {paquete.articulos

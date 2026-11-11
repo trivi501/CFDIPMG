@@ -27,6 +27,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
+import { fechaMx } from '@/lib/fechas';
 import { PAYMENT_FORMS } from '@/lib/sat-catalogs';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
@@ -211,7 +212,9 @@ export default function ApoyosIndex({ apoyos: paginator, filters }: PageProps) {
                             )}
                             {paginator.data.map((apoyo) => (
                                 <TableRow key={apoyo.id}>
-                                    <TableCell>{apoyo.fecha}</TableCell>
+                                    <TableCell>
+                                        {fechaMx(apoyo.fecha)}
+                                    </TableCell>
                                     <TableCell className="font-medium">
                                         {apoyo.beneficiario?.nombre ?? '—'}
                                     </TableCell>

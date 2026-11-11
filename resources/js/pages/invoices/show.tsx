@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePermissions } from '@/hooks/use-permissions';
+import { fechaMxDeMomento } from '@/lib/fechas';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
 
@@ -124,7 +125,7 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                                 </span>
                             </p>
                             <p className="text-muted-foreground">
-                                Emitida: {invoice.issued_at ?? '—'}
+                                Emitida: {fechaMxDeMomento(invoice.issued_at)}
                             </p>
                             {invoice.canceled_at && (
                                 <p className="text-muted-foreground">

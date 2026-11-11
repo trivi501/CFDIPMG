@@ -17,6 +17,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
+import { fechaMx } from '@/lib/fechas';
 import {
     PAYMENT_FORMS,
     pickUseForRegime,
@@ -189,7 +190,7 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <Heading
                         title={`Apoyo de ${apoyo.beneficiario?.nombre ?? '—'}`}
-                        description={`Registrado por ${apoyo.user?.name ?? '—'}${apoyo.area ? ` (${apoyo.area.nombre})` : ''} el ${apoyo.fecha}`}
+                        description={`Registrado por ${apoyo.user?.name ?? '—'}${apoyo.area ? ` (${apoyo.area.nombre})` : ''} el ${fechaMx(apoyo.fecha)}`}
                     />
                     <div className="flex flex-wrap gap-2">
                         {apoyo.estatus === 'preparado' &&

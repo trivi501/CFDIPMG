@@ -19,6 +19,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
+import { fechaMx } from '@/lib/fechas';
 import { dashboard } from '@/routes';
 import facturasCompra from '@/routes/facturas-compra';
 
@@ -69,7 +70,7 @@ export default function FacturasCompraIndex({
         value: String(factura.id),
         label:
             (factura.emisor ?? 'Factura de compra') +
-            (factura.fecha ? ` · ${factura.fecha}` : ''),
+            (factura.fecha ? ` · ${fechaMx(factura.fecha)}` : ''),
     }));
 
     const facturasAMostrar = selectedFacturaId
@@ -158,7 +159,7 @@ export default function FacturasCompraIndex({
                                 {factura.emisor ?? 'Factura de compra'}
                                 {factura.fecha && (
                                     <span className="ml-2 text-sm font-normal text-muted-foreground">
-                                        {factura.fecha}
+                                        {fechaMx(factura.fecha)}
                                     </span>
                                 )}
                             </CardTitle>

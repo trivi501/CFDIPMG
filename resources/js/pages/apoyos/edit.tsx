@@ -21,6 +21,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { getXsrfToken } from '@/lib/csrf';
+import { fechaMx } from '@/lib/fechas';
 import type { LineaPaquete, Paquete } from '@/lib/paquetes';
 import { dashboard } from '@/routes';
 import apoyos from '@/routes/apoyos';
@@ -191,7 +192,7 @@ export default function ApoyoEdit({
             value: String(factura.id),
             label:
                 (factura.emisor ?? 'Factura de compra') +
-                (factura.fecha ? ` · ${factura.fecha.slice(0, 10)}` : ''),
+                (factura.fecha ? ` · ${fechaMx(factura.fecha)}` : ''),
         }),
     );
     const selectedArticulo = articulosDeFactura.find(

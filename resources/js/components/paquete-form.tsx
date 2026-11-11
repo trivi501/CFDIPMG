@@ -16,6 +16,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { fechaMx } from '@/lib/fechas';
 import { paquetesDisponibles } from '@/lib/paquetes';
 import type { ArticuloStock, Paquete } from '@/lib/paquetes';
 import paquetes from '@/routes/paquetes';
@@ -57,7 +58,7 @@ export function PaqueteForm({
         value: String(factura.id),
         label:
             (factura.emisor ?? 'Factura de compra') +
-            (factura.fecha ? ` · ${factura.fecha.slice(0, 10)}` : ''),
+            (factura.fecha ? ` · ${fechaMx(factura.fecha)}` : ''),
     }));
 
     const opciones = (

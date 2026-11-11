@@ -15,6 +15,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
+import { fechaMxDeMomento } from '@/lib/fechas';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
 import globalInvoice from '@/routes/invoices/global';
@@ -168,7 +169,7 @@ export default function InvoicesIndex({
                                         {currency.format(Number(invoice.total))}
                                     </TableCell>
                                     <TableCell>
-                                        {invoice.issued_at ?? '—'}
+                                        {fechaMxDeMomento(invoice.issued_at)}
                                     </TableCell>
                                     <TableCell>
                                         <Badge

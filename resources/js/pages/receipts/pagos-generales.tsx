@@ -12,6 +12,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { fechaMx } from '@/lib/fechas';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
 import receipts from '@/routes/receipts';
@@ -124,7 +125,7 @@ export default function PagosGenerales({ pagos }: { pagos: Pago[] }) {
                                     <TableCell>
                                         {pago.tipo_pago ?? '—'}
                                     </TableCell>
-                                    <TableCell>{pago.fecha ?? '—'}</TableCell>
+                                    <TableCell>{fechaMx(pago.fecha)}</TableCell>
                                     <TableCell>
                                         {pago.contribuyente_nombre ?? '—'}
                                     </TableCell>
