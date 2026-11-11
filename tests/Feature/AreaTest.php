@@ -23,7 +23,7 @@ class AreaTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
     }
 
-    private function usuario(?Area $area = null, string $rol = 'Facturación'): User
+    private function usuario(?Area $area = null, string $rol = 'Apoyos'): User
     {
         $user = User::factory()->create(['area_id' => $area?->id]);
         $user->assignRole($rol);

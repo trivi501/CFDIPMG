@@ -26,7 +26,7 @@ class DocumentosPrivadosTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
     }
 
-    private function usuario(string $rol = 'Facturación'): User
+    private function usuario(string $rol = 'Apoyos'): User
     {
         $user = User::factory()->create();
         $user->assignRole($rol);

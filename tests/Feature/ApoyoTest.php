@@ -30,10 +30,10 @@ class ApoyoTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
     }
 
-    protected function billingUser(): User
+    protected function apoyosUser(): User
     {
         $user = User::factory()->create();
-        $user->assignRole('Facturación');
+        $user->assignRole('Apoyos');
 
         return $user;
     }
@@ -102,7 +102,7 @@ class ApoyoTest extends TestCase
 
     public function test_it_creates_an_apoyo_with_detalles_and_computes_totals(): void
     {
-        $user = $this->billingUser();
+        $user = $this->apoyosUser();
 
         $response = $this->actingAs($user)->post('/apoyos', $this->payload());
 
@@ -125,7 +125,7 @@ class ApoyoTest extends TestCase
 
         $file = UploadedFile::fake()->create('solicitud.pdf', 100, 'application/pdf');
 
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload(['solicitud_recibo' => $file]));
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload(['solicitud_recibo' => $file]));
 
         $apoyo = Apoyo::firstOrFail();
 
@@ -135,7 +135,7 @@ class ApoyoTest extends TestCase
 
     public function test_updating_an_apoyo_replaces_its_detalles(): void
     {
-        $user = $this->billingUser();
+        $user = $this->apoyosUser();
         $this->actingAs($user)->post('/apoyos', $this->payload());
         $apoyo = Apoyo::firstOrFail();
 
@@ -173,7 +173,7 @@ class ApoyoTest extends TestCase
 
     public function test_it_deletes_an_apoyo_and_its_detalles(): void
     {
-        $user = $this->billingUser();
+        $user = $this->apoyosUser();
         $this->actingAs($user)->post('/apoyos', $this->payload());
         $apoyo = Apoyo::firstOrFail();
 
@@ -205,7 +205,7 @@ class ApoyoTest extends TestCase
     {
         $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
 
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload([
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload([
             'detalles' => [
                 [
                     'articulo_factura_compra_id' => $articulo->id,
@@ -224,7 +224,7 @@ class ApoyoTest extends TestCase
     {
         $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
 
-        $response = $this->actingAs($this->billingUser())->post('/apoyos', $this->payload([
+        $response = $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload([
             'detalles' => [
                 [
                     'articulo_factura_compra_id' => $articulo->id,
@@ -243,7 +243,7 @@ class ApoyoTest extends TestCase
 
     public function test_updating_an_apoyo_adjusts_stock_between_the_old_and_new_quantity(): void
     {
-        $user = $this->billingUser();
+        $user = $this->apoyosUser();
         $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
 
         $this->actingAs($user)->post('/apoyos', $this->payload([
@@ -280,7 +280,7 @@ class ApoyoTest extends TestCase
 
     public function test_deleting_an_apoyo_restores_the_stock_it_had_reserved(): void
     {
-        $user = $this->billingUser();
+        $user = $this->apoyosUser();
         $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
 
         $this->actingAs($user)->post('/apoyos', $this->payload([
@@ -305,8 +305,8 @@ class ApoyoTest extends TestCase
 
     public function test_a_user_only_sees_their_own_apoyos_but_admin_sees_all(): void
     {
-        $owner = $this->billingUser();
-        $other = $this->billingUser();
+        $owner = $this->apoyosUser();
+        $other = $this->apoyosUser();
         $admin = $this->adminUser();
 
         $this->actingAs($owner)->post('/apoyos', $this->payload());
@@ -337,7 +337,7 @@ class ApoyoTest extends TestCase
     public function test_facturar_is_only_allowed_once_an_apoyo_is_aprobado(): void
     {
         $admin = $this->adminUser();
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload());
         $apoyo = Apoyo::firstOrFail();
 
         $this->actingAs($admin)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload());
@@ -364,7 +364,7 @@ class ApoyoTest extends TestCase
     public function test_facturar_uses_the_rfc_captured_on_the_apoyo_when_present(): void
     {
         $admin = $this->adminUser();
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload());
         $apoyo = Apoyo::firstOrFail();
         $apoyo->update(['estatus' => 'aprobado']);
 
@@ -384,7 +384,7 @@ class ApoyoTest extends TestCase
     public function test_facturar_leaves_the_apoyo_aprobado_when_facturapi_fails(): void
     {
         $admin = $this->adminUser();
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload());
         $apoyo = Apoyo::firstOrFail();
         $apoyo->update(['estatus' => 'aprobado']);
 
@@ -404,7 +404,7 @@ class ApoyoTest extends TestCase
         $admin = $this->adminUser();
         $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
 
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload([
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload([
             'detalles' => [
                 [
                     'articulo_factura_compra_id' => $articulo->id,
@@ -430,17 +430,44 @@ class ApoyoTest extends TestCase
 
     public function test_only_admin_can_approve_or_facturar_an_apoyo(): void
     {
-        $billing = $this->billingUser();
-        $this->actingAs($billing)->post('/apoyos', $this->payload());
+        $capturista = $this->apoyosUser();
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
         $apoyo = Apoyo::firstOrFail();
 
-        $this->actingAs($billing)->patch("/apoyos/{$apoyo->id}/aprobar")->assertForbidden();
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/aprobar")->assertForbidden();
+    }
+
+    public function test_los_roles_de_apoyos_y_facturacion_estan_separados(): void
+    {
+        $capturista = $this->apoyosUser();
+        $facturacion = User::factory()->create();
+        $facturacion->assignRole('Facturación');
+
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        $apoyo = Apoyo::firstOrFail();
+
+        $this->actingAs($capturista)->get('/invoices')->assertForbidden();
+        $this->actingAs($capturista)->get('/receipts')->assertForbidden();
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload())->assertForbidden();
+
+        $this->actingAs($facturacion)->get('/apoyos/create')->assertForbidden();
+        $this->actingAs($facturacion)->post('/apoyos', $this->payload())->assertForbidden();
+        $this->actingAs($facturacion)->get("/apoyos/{$apoyo->id}/edit")->assertForbidden();
+        $this->actingAs($facturacion)->patch("/apoyos/{$apoyo->id}/aprobar")->assertForbidden();
+        $this->actingAs($facturacion)->get("/apoyos/{$apoyo->id}")->assertOk();
+
+        $this->actingAs($this->adminUser())->patch("/apoyos/{$apoyo->id}/aprobar");
+        $this->fakeFacturapi();
+
+        $this->actingAs($facturacion)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload())
+            ->assertRedirect();
+        $this->assertSame('facturado', $apoyo->refresh()->estatus);
     }
 
     public function test_a_user_can_view_their_own_apoyo_but_not_someone_elses(): void
     {
-        $owner = $this->billingUser();
-        $other = $this->billingUser();
+        $owner = $this->apoyosUser();
+        $other = $this->apoyosUser();
         $admin = $this->adminUser();
 
         $this->actingAs($owner)->post('/apoyos', $this->payload());
@@ -454,7 +481,7 @@ class ApoyoTest extends TestCase
     public function test_admin_can_bulk_facturar_all_aprobado_apoyos(): void
     {
         $admin = $this->adminUser();
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload());
         $apoyo = Apoyo::firstOrFail();
         $apoyo->update(['estatus' => 'aprobado']);
 
@@ -484,7 +511,7 @@ class ApoyoTest extends TestCase
     public function test_un_apoyo_se_factura_como_egreso_pue_con_clave_93161700_y_unidad_c62(): void
     {
         $admin = $this->adminUser();
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload());
         $apoyo = Apoyo::firstOrFail();
         $apoyo->update(['estatus' => 'aprobado']);
 
@@ -511,8 +538,8 @@ class ApoyoTest extends TestCase
     public function test_facturar_todo_usa_g03_si_el_regimen_lo_permite_y_s01_si_no(): void
     {
         $admin = $this->adminUser();
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
-        $this->actingAs($this->billingUser())->post('/apoyos', $this->payload());
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload());
+        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload());
         [$conRfc, $sinRfc] = Apoyo::orderBy('id')->get()->all();
         $conRfc->update(['estatus' => 'aprobado', 'rfc' => 'PEJU800101AB1']);
         $sinRfc->update(['estatus' => 'aprobado']);

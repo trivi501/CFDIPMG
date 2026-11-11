@@ -26,6 +26,12 @@ class RolesAndPermissionsSeeder extends Seeder
             'products.view',
             'products.manage',
             'apoyos.view',
+            'apoyos.view-all',
+            'apoyos.facturar',
+            'apoyos.download-all',
+        ],
+        'Apoyos' => [
+            'apoyos.view',
             'apoyos.manage',
         ],
         'Consulta' => [

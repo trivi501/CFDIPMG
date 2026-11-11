@@ -22,10 +22,10 @@ class FacturaCompraTest extends TestCase
         Storage::fake('local');
     }
 
-    protected function billingUser(): User
+    protected function apoyosUser(): User
     {
         $user = User::factory()->create();
-        $user->assignRole('Facturación');
+        $user->assignRole('Apoyos');
 
         return $user;
     }
@@ -57,7 +57,7 @@ class FacturaCompraTest extends TestCase
     {
         $file = UploadedFile::fake()->createWithContent('factura.xml', $this->cfdiXml());
 
-        $response = $this->actingAs($this->billingUser())
+        $response = $this->actingAs($this->apoyosUser())
             ->postJson('/facturas-compra', ['xml' => $file]);
 
         $response->assertOk();
@@ -80,7 +80,7 @@ class FacturaCompraTest extends TestCase
     {
         $file = UploadedFile::fake()->createWithContent('factura.xml', '<?xml version="1.0"?><root><foo>bar</foo></root>');
 
-        $this->actingAs($this->billingUser())
+        $this->actingAs($this->apoyosUser())
             ->postJson('/facturas-compra', ['xml' => $file])
             ->assertStatus(422)
             ->assertJsonStructure(['message']);
@@ -89,7 +89,7 @@ class FacturaCompraTest extends TestCase
     public function test_it_rejects_registering_the_exact_same_xml_twice(): void
     {
         $xml = $this->cfdiXml();
-        $user = $this->billingUser();
+        $user = $this->apoyosUser();
 
         $this->actingAs($user)->postJson('/facturas-compra', [
             'xml' => UploadedFile::fake()->createWithContent('factura.xml', $xml),
@@ -106,7 +106,7 @@ class FacturaCompraTest extends TestCase
     public function test_it_rejects_a_different_file_carrying_the_same_cfdi_uuid(): void
     {
         $uuid = '22222222-2222-2222-2222-222222222222';
-        $user = $this->billingUser();
+        $user = $this->apoyosUser();
 
         $this->actingAs($user)->postJson('/facturas-compra', [
             'xml' => UploadedFile::fake()->createWithContent('factura.xml', $this->cfdiXml($uuid)),
