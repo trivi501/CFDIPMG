@@ -1,0 +1,11 @@
+{
+    "Password updated.": "Contraseña actualizada.",
+    "Profile updated.": "Perfil actualizado.",
+    "Too Many Requests": "Demasiadas solicitudes",
+    "Server Error": "Error del servidor",
+    "Not Found": "No encontrado",
+    "Forbidden": "Acceso denegado",
+    "Unauthorized": "No autorizado",
+    "Page Expired": "La página expiró",
+    "Service Unavailable": "Servicio no disponible"
+}

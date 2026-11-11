@@ -103,6 +103,28 @@ class CambioPasswordObligatorioTest extends TestCase
         $this->assertTrue($user->refresh()->must_change_password);
     }
 
+    public function test_los_errores_salen_en_espanol_y_la_pantalla_recibe_los_requisitos(): void
+    {
+        $user = User::factory()->create([
+            'password' => 'Generica2026',
+            'must_change_password' => true,
+        ]);
+
+        $this->actingAs($user)->get('/cambiar-password')->assertInertia(
+            fn ($page) => $page->where('requisitos.min', 8)->has('requisitos.mixedCase')
+        );
+
+        $this->actingAs($user)->put('/cambiar-password', [
+            'password' => 'abc',
+            'password_confirmation' => 'abc',
+        ])->assertSessionHasErrors(['password' => 'El campo contraseña debe tener al menos 8 caracteres.']);
+
+        $this->actingAs($user)->put('/cambiar-password', [
+            'password' => 'MiNuevaClave.99',
+            'password_confirmation' => 'OtraCosa.99',
+        ])->assertSessionHasErrors(['password' => 'Las contraseñas no coinciden.']);
+    }
+
     public function test_puede_cerrar_sesion_sin_cambiarla(): void
     {
         $user = User::factory()->create(['must_change_password' => true]);
