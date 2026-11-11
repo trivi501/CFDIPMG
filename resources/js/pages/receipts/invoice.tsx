@@ -257,9 +257,9 @@ export default function ReceiptInvoice({
                                         <option
                                             key={customer.id}
                                             value={customer.id}
+                                            data-description={customer.rfc}
                                         >
-                                            {customer.legal_name} —{' '}
-                                            {customer.rfc}
+                                            {customer.legal_name}
                                         </option>
                                     ))}
                                 </NativeSelect>
