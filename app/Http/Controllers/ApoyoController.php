@@ -59,6 +59,11 @@ class ApoyoController extends Controller
         return Inertia::render('apoyos/index', [
             'apoyos' => $apoyos,
             'filters' => $request->only('estatus'),
+            // Cuántos tomarían "Aprobar todo" y "Facturar todo", sin importar el filtro ni la página.
+            'pendientes' => [
+                'preparados' => $this->visibleApoyos($request)->where('estatus', Apoyo::ESTATUS_PREPARADO)->count(),
+                'aprobados' => $this->visibleApoyos($request)->where('estatus', Apoyo::ESTATUS_APROBADO)->count(),
+            ],
         ]);
     }
 
@@ -213,6 +218,21 @@ class ApoyoController extends Controller
         return back();
     }
 
+    public function aprobarTodo(Request $request): RedirectResponse
+    {
+        $request->validate($this->seleccionRules());
+
+        // Uno por uno (no un UPDATE masivo) para que la bitácora guarde cada apoyo aprobado.
+        $apoyos = $this->seleccionados($request)->where('estatus', Apoyo::ESTATUS_PREPARADO)->get();
+        $apoyos->each->update(['estatus' => Apoyo::ESTATUS_APROBADO]);
+
+        Inertia::flash('toast', $apoyos->isEmpty()
+            ? ['type' => 'error', 'message' => 'No había apoyos preparados por aprobar.']
+            : ['type' => 'success', 'message' => "{$apoyos->count()} apoyo(s) aprobado(s)."]);
+
+        return back();
+    }
+
     public function rechazar(Request $request, Apoyo $apoyo): RedirectResponse
     {
         if ($apoyo->estatus !== Apoyo::ESTATUS_PREPARADO) {
@@ -281,11 +301,12 @@ class ApoyoController extends Controller
         $data = $request->validate([
             'payment_form' => ['required', 'string', 'max:2'],
             ...ImpuestosFactura::reglas(),
+            ...$this->seleccionRules(),
         ]);
 
         $impuestos = ImpuestosFactura::desde($request, ivaPorDefecto: false);
 
-        $apoyos = $this->visibleApoyos($request)
+        $apoyos = $this->seleccionados($request)
             ->where('estatus', Apoyo::ESTATUS_APROBADO)
             ->with('beneficiario', 'detalles')
             ->get();
@@ -427,6 +448,33 @@ class ApoyoController extends Controller
                 $query->orWhere('area_id', $user->area_id);
             }
         });
+    }
+
+    /**
+     * "Aprobar todo" y "Facturar todo" pueden recibir los apoyos marcados en la tabla.
+     *
+     * @return array<string, mixed>
+     */
+    protected function seleccionRules(): array
+    {
+        return [
+            'ids' => ['nullable', 'array'],
+            'ids.*' => ['integer'],
+        ];
+    }
+
+    /**
+     * Los apoyos marcados, o todos los visibles si no se marcó ninguno. Un id que el usuario no
+     * puede ver simplemente no se toma en cuenta.
+     *
+     * @return Builder<Apoyo>
+     */
+    protected function seleccionados(Request $request): Builder
+    {
+        $ids = $request->array('ids');
+
+        return $this->visibleApoyos($request)
+            ->when($ids !== [], fn (Builder $query) => $query->whereIn('id', $ids));
     }
 
     protected function authorizeAccess(Request $request, Apoyo $apoyo): void

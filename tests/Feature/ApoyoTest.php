@@ -437,6 +437,90 @@ class ApoyoTest extends TestCase
         $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/aprobar")->assertForbidden();
     }
 
+    public function test_aprobar_todo_aprueba_solo_los_preparados(): void
+    {
+        $capturista = $this->apoyosUser();
+        $admin = $this->adminUser();
+
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        [$primero, $segundo, $tercero] = Apoyo::orderBy('id')->get()->all();
+        $this->actingAs($admin)->patch("/apoyos/{$tercero->id}/rechazar");
+
+        $this->actingAs($admin)->get('/apoyos')->assertInertia(
+            fn ($page) => $page->where('pendientes', ['preparados' => 2, 'aprobados' => 0])
+        );
+
+        $this->actingAs($admin)->post('/apoyos/aprobar-todo')->assertRedirect();
+
+        $this->assertSame('aprobado', $primero->refresh()->estatus);
+        $this->assertSame('aprobado', $segundo->refresh()->estatus);
+        $this->assertSame('rechazado', $tercero->refresh()->estatus);
+
+        $this->actingAs($admin)->get('/apoyos')->assertInertia(
+            fn ($page) => $page->where('pendientes', ['preparados' => 0, 'aprobados' => 2])
+        );
+    }
+
+    public function test_aprobar_y_facturar_solo_los_seleccionados(): void
+    {
+        $capturista = $this->apoyosUser();
+        $admin = $this->adminUser();
+
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        [$primero, $segundo, $tercero] = Apoyo::orderBy('id')->get()->all();
+
+        $this->actingAs($admin)->post('/apoyos/aprobar-todo', ['ids' => [$primero->id, $segundo->id]]);
+
+        $this->assertSame('aprobado', $primero->refresh()->estatus);
+        $this->assertSame('aprobado', $segundo->refresh()->estatus);
+        $this->assertSame('preparado', $tercero->refresh()->estatus);
+
+        $this->fakeFacturapi();
+
+        $this->actingAs($admin)->post('/apoyos/facturar-todo', [
+            'payment_form' => '01',
+            'ids' => [$segundo->id, $tercero->id],
+        ])->assertRedirect();
+
+        // El tercero no estaba aprobado y el primero no se marcó: solo se factura el segundo.
+        $this->assertSame('aprobado', $primero->refresh()->estatus);
+        $this->assertSame('facturado', $segundo->refresh()->estatus);
+        $this->assertSame('preparado', $tercero->refresh()->estatus);
+    }
+
+    public function test_aprobar_seleccionados_ignora_apoyos_que_el_usuario_no_ve(): void
+    {
+        $dueno = $this->apoyosUser();
+        $this->actingAs($dueno)->post('/apoyos', $this->payload());
+        $ajeno = Apoyo::firstOrFail();
+
+        // Usuario sin "ver todo" pero con permiso de aprobar.
+        $aprobador = User::factory()->create();
+        $aprobador->givePermissionTo('apoyos.view', 'apoyos.approve');
+
+        $this->actingAs($aprobador)->post('/apoyos/aprobar-todo', ['ids' => [$ajeno->id]]);
+
+        $this->assertSame('preparado', $ajeno->refresh()->estatus);
+    }
+
+    public function test_solo_quien_puede_aprobar_usa_aprobar_todo(): void
+    {
+        $capturista = $this->apoyosUser();
+        $facturacion = User::factory()->create();
+        $facturacion->assignRole('Facturación');
+
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        $apoyo = Apoyo::firstOrFail();
+
+        $this->actingAs($capturista)->post('/apoyos/aprobar-todo')->assertForbidden();
+        $this->actingAs($facturacion)->post('/apoyos/aprobar-todo')->assertForbidden();
+        $this->assertSame('preparado', $apoyo->refresh()->estatus);
+    }
+
     public function test_los_roles_de_apoyos_y_facturacion_estan_separados(): void
     {
         $capturista = $this->apoyosUser();

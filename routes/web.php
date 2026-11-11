@@ -96,6 +96,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('facturas-compra', [FacturaCompraController::class, 'store'])
             ->middleware('permission:apoyos.manage')
             ->name('facturas-compra.store');
+        Route::post('apoyos/aprobar-todo', [ApoyoController::class, 'aprobarTodo'])
+            ->middleware('permission:apoyos.approve')
+            ->name('apoyos.aprobar-todo');
         Route::post('apoyos/facturar-todo', [ApoyoController::class, 'facturarTodo'])
             ->middleware('permission:apoyos.facturar')
             ->name('apoyos.facturar-todo');
