@@ -114,4 +114,16 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Contraseña inicial de usuarios nuevos
+    |--------------------------------------------------------------------------
+    |
+    | Los usuarios que da de alta un administrador se crean con esta contraseña
+    | genérica y deben cambiarla en su primer inicio de sesión.
+    |
+    */
+
+    'password_inicial' => env('USUARIOS_PASSWORD_INICIAL', 'Guadalupe2026'),
+
 ];

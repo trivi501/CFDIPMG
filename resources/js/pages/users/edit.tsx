@@ -77,6 +77,10 @@ export default function UserEdit({
                                     minLength={8}
                                     placeholder="Dejar en blanco para no cambiar"
                                 />
+                                <p className="text-sm text-muted-foreground">
+                                    Si la cambias, el usuario tendrá que elegir
+                                    una nueva al iniciar sesión.
+                                </p>
                                 <InputError message={errors.password} />
                             </div>
 

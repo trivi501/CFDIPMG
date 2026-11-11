@@ -12,9 +12,11 @@ import { dashboard } from '@/routes';
 import users from '@/routes/users';
 
 export default function UserCreate({
+    passwordInicial,
     roles,
     areas,
 }: {
+    passwordInicial: string;
     roles: string[];
     areas: AreaOpcion[];
 }) {
@@ -50,16 +52,13 @@ export default function UserCreate({
                                 <InputError message={errors.email} />
                             </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="password">Contraseña</Label>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    name="password"
-                                    required
-                                    minLength={8}
-                                />
-                                <InputError message={errors.password} />
+                            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                                Se creará con la contraseña inicial{' '}
+                                <code className="rounded bg-background px-1.5 py-0.5 font-mono font-semibold">
+                                    {passwordInicial}
+                                </code>
+                                . Al iniciar sesión por primera vez tendrá que
+                                cambiarla.
                             </div>
 
                             <UserAreaFields areas={areas} errors={errors} />

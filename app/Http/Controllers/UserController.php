@@ -39,6 +39,7 @@ class UserController extends Controller
     public function create(): Response
     {
         return Inertia::render('users/create', [
+            'passwordInicial' => config()->string('auth.password_inicial'),
             'roles' => Role::orderBy('name')->pluck('name'),
             'areas' => $this->areas(),
         ]);
@@ -49,17 +50,18 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
             'area_id' => ['nullable', 'integer', 'exists:areas,id'],
             'titulo' => ['nullable', 'string', 'max:255'],
             'roles' => ['array'],
             'roles.*' => ['string', 'exists:roles,name'],
         ]);
 
+        // Entra con la contraseña genérica y RequireCambioPassword lo obliga a cambiarla.
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'password' => Hash::make($data['password']),
+            'password' => Hash::make(config()->string('auth.password_inicial')),
+            'must_change_password' => true,
             'area_id' => $data['area_id'] ?? null,
             'titulo' => $data['titulo'] ?? null,
         ]);
@@ -98,7 +100,11 @@ class UserController extends Controller
                 'email' => $data['email'],
                 'area_id' => $data['area_id'] ?? null,
                 'titulo' => $data['titulo'] ?? null,
-                ...(! empty($data['password']) ? ['password' => Hash::make($data['password'])] : []),
+                // Una contraseña puesta por el administrador también hay que cambiarla al entrar.
+                ...(! empty($data['password']) ? [
+                    'password' => Hash::make($data['password']),
+                    'must_change_password' => true,
+                ] : []),
             ]);
 
             // Los apoyos que registró antes de tener área pasan a su área; los que ya tenían área se quedan ahí.

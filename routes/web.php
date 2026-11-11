@@ -4,6 +4,7 @@ use App\Http\Controllers\ApiClientController;
 use App\Http\Controllers\ApoyoController;
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\AuditoriaController;
+use App\Http\Controllers\Auth\CambiarPasswordController;
 use App\Http\Controllers\BeneficiarioController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -20,6 +21,13 @@ use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
+
+Route::middleware('auth')->group(function () {
+    Route::get('cambiar-password', [CambiarPasswordController::class, 'edit'])->name('password.cambiar');
+    Route::put('cambiar-password', [CambiarPasswordController::class, 'update'])
+        ->middleware('throttle:6,1')
+        ->name('password.cambiar.update');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
