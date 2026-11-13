@@ -6,6 +6,16 @@
             "runtimeExecutable": "composer",
             "runtimeArgs": ["run", "dev"],
             "port": 8000
+        },
+        {
+            "name": "cfdipmg-laragon",
+            "runtimeExecutable": "cmd",
+            "runtimeArgs": [
+                "/c",
+                "set PATH=C:\\laragon\\bin\\php\\php-8.3.30-Win32-vs16-x64;C:\\laragon\\bin\\nodejs\\node-v22.22.3;C:\\laragon\\bin\\composer;%PATH%&& set SERVER_PORT=8010&& composer run dev"
+            ],
+            "port": 8010,
+            "autoPort": false
         }
     ]
 }
