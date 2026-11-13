@@ -1,8 +1,8 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { EstatusBadge } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
 import { ImpuestosFields } from '@/components/impuestos-fields';
 import InputError from '@/components/input-error';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -75,23 +75,6 @@ const currency = new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency: 'MXN',
 });
-
-const estatusLabels: Record<Estatus, string> = {
-    preparado: 'Preparado',
-    aprobado: 'Aprobado',
-    facturado: 'Facturado',
-    rechazado: 'Rechazado',
-};
-
-const estatusVariants: Record<
-    Estatus,
-    'outline' | 'secondary' | 'default' | 'destructive'
-> = {
-    preparado: 'outline',
-    aprobado: 'secondary',
-    facturado: 'default',
-    rechazado: 'destructive',
-};
 
 function isImagen(path: string): boolean {
     return /\.(jpe?g|png|gif|webp)$/i.test(path);
@@ -222,9 +205,10 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                             <p className="text-sm text-muted-foreground">
                                 Estatus
                             </p>
-                            <Badge variant={estatusVariants[apoyo.estatus]}>
-                                {estatusLabels[apoyo.estatus]}
-                            </Badge>
+                            <EstatusBadge
+                                tipo="apoyo"
+                                estatus={apoyo.estatus}
+                            />
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">

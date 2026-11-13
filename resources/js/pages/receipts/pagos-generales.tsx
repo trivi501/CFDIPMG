@@ -1,7 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import { EstatusBadge } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -137,11 +137,17 @@ export default function PagosGenerales({ pagos }: { pagos: Pago[] }) {
                                     </TableCell>
                                     <TableCell>
                                         {pago.receipt_status === 'invoiced' ? (
-                                            <Badge>Facturado</Badge>
+                                            <EstatusBadge
+                                                tipo="recibo"
+                                                estatus="invoiced"
+                                            />
                                         ) : (
-                                            <Badge variant="outline">
+                                            <EstatusBadge
+                                                tipo="recibo"
+                                                estatus="pending"
+                                            >
                                                 Sin facturar
-                                            </Badge>
+                                            </EstatusBadge>
                                         )}
                                     </TableCell>
                                     <TableCell className="text-right">

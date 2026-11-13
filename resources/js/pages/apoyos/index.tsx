@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
+import { EstatusBadge } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
 import { ImpuestosFields } from '@/components/impuestos-fields';
 import { Pagination } from '@/components/pagination';
@@ -111,23 +112,6 @@ const currency = new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency: 'MXN',
 });
-
-const estatusLabels: Record<Estatus, string> = {
-    preparado: 'Preparado',
-    aprobado: 'Aprobado',
-    facturado: 'Facturado',
-    rechazado: 'Rechazado',
-};
-
-const estatusVariants: Record<
-    Estatus,
-    'outline' | 'secondary' | 'default' | 'destructive'
-> = {
-    preparado: 'outline',
-    aprobado: 'secondary',
-    facturado: 'default',
-    rechazado: 'destructive',
-};
 
 export default function ApoyosIndex({
     apoyos: paginator,
@@ -638,13 +622,10 @@ export default function ApoyosIndex({
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        <Badge
-                                            variant={
-                                                estatusVariants[apoyo.estatus]
-                                            }
-                                        >
-                                            {estatusLabels[apoyo.estatus]}
-                                        </Badge>
+                                        <EstatusBadge
+                                            tipo="apoyo"
+                                            estatus={apoyo.estatus}
+                                        />
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-0.5">

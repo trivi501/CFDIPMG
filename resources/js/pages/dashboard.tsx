@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import { EstatusBadge } from '@/components/estatus-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
@@ -112,9 +113,11 @@ export default function Dashboard({ stats, recentInvoices }: PageProps) {
                                                     Number(invoice.total),
                                                 )}
                                             </p>
-                                            <p className="text-muted-foreground capitalize">
-                                                {invoice.status}
-                                            </p>
+                                            <EstatusBadge
+                                                tipo="factura"
+                                                estatus={invoice.status}
+                                                className="mt-1"
+                                            />
                                         </div>
                                     </li>
                                 ))}

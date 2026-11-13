@@ -1,9 +1,9 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { List, Search } from 'lucide-react';
+import { EstatusBadge, etiquetaEstatus } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
 import { Pagination } from '@/components/pagination';
 import type { Paginator } from '@/components/pagination';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -33,23 +33,6 @@ type Receipt = {
 type PageProps = {
     receipts: Paginator<Receipt>;
     filters: { status?: string };
-};
-
-const STATUS_LABELS: Record<Receipt['status'], string> = {
-    pending: 'Pendiente',
-    invoiced: 'Facturado',
-    canceled: 'Cancelado',
-    failed: 'Fallido',
-};
-
-const STATUS_VARIANTS: Record<
-    Receipt['status'],
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    pending: 'outline',
-    invoiced: 'default',
-    canceled: 'secondary',
-    failed: 'destructive',
 };
 
 const currency = new Intl.NumberFormat('es-MX', {
@@ -113,7 +96,10 @@ export default function ReceiptsIndex({
                             }
                         >
                             {status
-                                ? STATUS_LABELS[status as Receipt['status']]
+                                ? etiquetaEstatus(
+                                      'recibo',
+                                      status as Receipt['status'],
+                                  )
                                 : 'Todos'}
                         </Button>
                     ))}
@@ -158,13 +144,10 @@ export default function ReceiptsIndex({
                                     </TableCell>
                                     <TableCell>{receipt.received_at}</TableCell>
                                     <TableCell>
-                                        <Badge
-                                            variant={
-                                                STATUS_VARIANTS[receipt.status]
-                                            }
-                                        >
-                                            {STATUS_LABELS[receipt.status]}
-                                        </Badge>
+                                        <EstatusBadge
+                                            tipo="recibo"
+                                            estatus={receipt.status}
+                                        />
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {receipt.status === 'pending' &&

@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { FileDown, Plus, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { EstatusBadge, etiquetaEstatus } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
 import { Pagination } from '@/components/pagination';
 import type { Paginator } from '@/components/pagination';
@@ -47,21 +48,6 @@ const tieneXml = (invoice: Invoice) =>
 
 const nombreFactura = (invoice: Invoice) =>
     `${invoice.series ?? ''}${invoice.folio ?? ''} ${invoice.customer?.legal_name ?? ''}`.trim();
-
-const STATUS_LABELS: Record<Invoice['status'], string> = {
-    valid: 'Vigente',
-    canceled: 'Cancelada',
-    failed: 'Fallida',
-};
-
-const STATUS_VARIANTS: Record<
-    Invoice['status'],
-    'default' | 'secondary' | 'destructive'
-> = {
-    valid: 'default',
-    canceled: 'secondary',
-    failed: 'destructive',
-};
 
 const currency = new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -210,9 +196,10 @@ export default function InvoicesIndex({
                                     }
                                 >
                                     {status
-                                        ? STATUS_LABELS[
-                                              status as Invoice['status']
-                                          ]
+                                        ? etiquetaEstatus(
+                                              'factura',
+                                              status as Invoice['status'],
+                                          )
                                         : 'Todas'}
                                 </Button>
                             ),
@@ -384,13 +371,10 @@ export default function InvoicesIndex({
                                         {fechaMxDeMomento(invoice.issued_at)}
                                     </TableCell>
                                     <TableCell>
-                                        <Badge
-                                            variant={
-                                                STATUS_VARIANTS[invoice.status]
-                                            }
-                                        >
-                                            {STATUS_LABELS[invoice.status]}
-                                        </Badge>
+                                        <EstatusBadge
+                                            tipo="factura"
+                                            estatus={invoice.status}
+                                        />
                                     </TableCell>
                                 </TableRow>
                             ))}

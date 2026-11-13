@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { Ban, FileText, FileType } from 'lucide-react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EstatusBadge } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,12 +36,6 @@ type Invoice = {
         source_system: string;
         amount: string;
     }[];
-};
-
-const STATUS_LABELS: Record<Invoice['status'], string> = {
-    valid: 'Vigente',
-    canceled: 'Cancelada',
-    failed: 'Fallida',
 };
 
 const MONTHS = [
@@ -79,17 +74,7 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                         {invoice.is_global && (
                             <Badge variant="secondary">Global</Badge>
                         )}
-                        <Badge
-                            variant={
-                                invoice.status === 'valid'
-                                    ? 'default'
-                                    : invoice.status === 'failed'
-                                      ? 'destructive'
-                                      : 'secondary'
-                            }
-                        >
-                            {STATUS_LABELS[invoice.status]}
-                        </Badge>
+                        <EstatusBadge tipo="factura" estatus={invoice.status} />
                     </div>
                 </div>
 

@@ -1,10 +1,10 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Plus, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
+import { EstatusBadge } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { PaqueteSelector } from '@/components/paquete-selector';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
@@ -94,23 +94,6 @@ const currency = new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency: 'MXN',
 });
-
-const estatusLabels: Record<Apoyo['estatus'], string> = {
-    preparado: 'Preparado',
-    aprobado: 'Aprobado',
-    facturado: 'Facturado',
-    rechazado: 'Rechazado',
-};
-
-const estatusVariants: Record<
-    Apoyo['estatus'],
-    'outline' | 'secondary' | 'default' | 'destructive'
-> = {
-    preparado: 'outline',
-    aprobado: 'secondary',
-    facturado: 'default',
-    rechazado: 'destructive',
-};
 
 export default function ApoyoEdit({
     apoyo,
@@ -624,11 +607,10 @@ export default function ApoyoEdit({
                             <div className="grid gap-2">
                                 <Label>Estatus</Label>
                                 <div>
-                                    <Badge
-                                        variant={estatusVariants[apoyo.estatus]}
-                                    >
-                                        {estatusLabels[apoyo.estatus]}
-                                    </Badge>
+                                    <EstatusBadge
+                                        tipo="apoyo"
+                                        estatus={apoyo.estatus}
+                                    />
                                 </div>
                                 <p className="text-sm text-muted-foreground">
                                     Aprobar y facturar se hacen desde el listado
