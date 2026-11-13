@@ -52,6 +52,37 @@ class AuditoriaTest extends TestCase
         $this->assertSame(1, $movimientos->pluck('lote')->unique()->count());
     }
 
+    public function test_una_insercion_masiva_no_altera_el_id_que_regresa_insert_get_id(): void
+    {
+        Auditoria::query()->delete();
+        Beneficiario::create(['nombre' => 'Ocupa el id 1']);
+
+        $id = DB::table('beneficiarios')->insertGetId(['nombre' => 'Sin modelo']);
+
+        $this->assertSame('Sin modelo', DB::table('beneficiarios')->where('id', $id)->value('nombre'));
+        $this->assertTrue(Auditoria::where('accion', 'cambio masivo')->where('tabla', 'beneficiarios')->exists());
+    }
+
+    public function test_sin_eventos_de_modelo_el_alta_conserva_su_propio_id(): void
+    {
+        Auditoria::query()->delete();
+
+        $beneficiario = Beneficiario::withoutEvents(fn () => Beneficiario::create(['nombre' => 'Sembrado']));
+
+        $this->assertSame('Sembrado', Beneficiario::findOrFail($beneficiario->id)->nombre);
+    }
+
+    public function test_no_registra_inserciones_de_una_transaccion_revertida(): void
+    {
+        Auditoria::query()->delete();
+
+        DB::beginTransaction();
+        DB::table('beneficiarios')->insert(['nombre' => 'Revertido']);
+        DB::rollBack();
+
+        $this->assertFalse(Auditoria::where('tabla', 'beneficiarios')->exists());
+    }
+
     public function test_registra_cambios_masivos_una_sola_vez_y_oculta_contrasenas(): void
     {
         $usuario = User::factory()->create();

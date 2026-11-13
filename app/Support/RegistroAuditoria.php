@@ -7,10 +7,13 @@ use App\Models\User;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\Events\TransactionCommitting;
+use Illuminate\Database\Events\TransactionRolledBack;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Arr;
@@ -49,8 +52,25 @@ class RegistroAuditoria
      */
     private static array $pendientes = [];
 
+    /**
+     * Inserciones masivas por registrar todavía. No se escriben al momento: QueryExecuted se dispara
+     * antes de que Laravel lea lastInsertId(), y un INSERT a la bitácora en ese instante haría que el
+     * insertGetId() original regresara el id de la fila de auditoría. Se escriben antes de la
+     * siguiente consulta, al confirmar la transacción o al terminar la petición o el comando.
+     *
+     * @var list<array{nivel: int, datos: array<string, mixed>}>
+     */
+    private static array $diferidos = [];
+
     public static function registrar(): void
     {
+        DB::beforeExecuting(fn () => self::escribirDiferidos());
+        Event::listen(TransactionCommitting::class, fn () => self::escribirDiferidos());
+        Event::listen(TransactionRolledBack::class, fn (TransactionRolledBack $e) => self::descartarDiferidos($e->connection->transactionLevel()));
+        Event::listen(CommandFinished::class, fn () => self::escribirDiferidos());
+        Event::listen(JobProcessed::class, fn () => self::escribirDiferidos());
+        app()->terminating(fn () => self::escribirDiferidos());
+
         Event::listen('eloquent.creating: *', fn (string $evento, array $datos) => self::marcar('insert', $datos[0]));
         Event::listen('eloquent.updating: *', fn (string $evento, array $datos) => self::marcar('update', $datos[0]));
         Event::listen('eloquent.deleting: *', fn (string $evento, array $datos) => self::marcar('delete', $datos[0]));
@@ -174,7 +194,7 @@ class RegistroAuditoria
             $instruccion = mb_substr($instruccion, 0, self::LARGO_MAXIMO_INSTRUCCION).' …';
         }
 
-        Auditoria::escribir([
+        $datos = [
             'accion' => 'cambio masivo',
             'tabla' => $tabla,
             'descripcion' => match ($tipo) {
@@ -183,7 +203,39 @@ class RegistroAuditoria
                 default => "Eliminación en {$tabla}",
             },
             'despues' => ['instrucción' => $instruccion],
-        ]);
+        ];
+
+        if ($tipo === 'insert') {
+            self::$diferidos[] = ['nivel' => $consulta->connection->transactionLevel(), 'datos' => $datos];
+
+            return;
+        }
+
+        Auditoria::escribir($datos);
+    }
+
+    private static function escribirDiferidos(): void
+    {
+        if (self::$diferidos === []) {
+            return;
+        }
+
+        // Se vacía antes de escribir: los INSERT a la bitácora vuelven a pasar por beforeExecuting.
+        $diferidos = self::$diferidos;
+        self::$diferidos = [];
+
+        foreach ($diferidos as $diferido) {
+            Auditoria::escribir($diferido['datos']);
+        }
+    }
+
+    /** Lo insertado dentro de la transacción (o savepoint) revertida ya no existe: no se registra. */
+    private static function descartarDiferidos(int $nivelActual): void
+    {
+        self::$diferidos = array_values(array_filter(
+            self::$diferidos,
+            fn (array $diferido) => $diferido['nivel'] <= $nivelActual,
+        ));
     }
 
     private static function interpolar(QueryExecuted $consulta, bool $ocultarValores): string
