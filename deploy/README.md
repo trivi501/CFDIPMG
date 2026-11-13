@@ -21,6 +21,8 @@ Los deploys son solo manuales: hacer push a `main` no cambia nada en el servidor
   `PERMITIR_MIGRACION_DESTRUCTIVA=1 bash deploy/deploy.sh`
 - El seeder solo corre en la primera instalación (con la tabla `users` vacía). Volver a correrlo
   regresaría los permisos de los roles a los de fábrica.
+- Los permisos nuevos que traiga el código se agregan en cada deploy con
+  `php artisan permisos:sincronizar`, que nunca quita nada (ver abajo).
 - El `.env` y los archivos subidos (`storage/`) no se tocan.
 - Respaldo diario a las 2:30 a. m. en `/var/backups/cfdi` (se guardan los últimos 60).
 
@@ -69,6 +71,27 @@ sudo -u deploy bash -c 'cd /var/www/cfdi && bash deploy/deploy.sh 9c2b380'
 ```
 
 Regresar el código a un commit anterior no revierte migraciones: la base se queda como está.
+
+## Sincronizar permisos
+
+Los permisos y los roles de fábrica están en `app/Support/CatalogoPermisos.php`. Cada deploy corre
+`php artisan permisos:sincronizar`, que:
+
+- crea los permisos y roles del catálogo que falten en la base;
+- asigna cada permiso **recién creado** a los roles que lo traen en el catálogo (Admin recibe todos);
+- **no toca** los permisos que ya existían: si se lo quitaste a un rol desde la pantalla de Roles,
+  así se queda;
+- nunca quita permisos, roles ni asignaciones; los que sobren en la base solo los reporta.
+
+Para ver qué haría sin cambiar nada, o correrlo a mano:
+
+```bash
+sudo -u deploy bash -c 'cd /var/www/cfdi && php artisan permisos:sincronizar --pretend'
+```
+
+```bash
+sudo -u deploy bash -c 'cd /var/www/cfdi && php artisan permisos:sincronizar'
+```
 
 ## Si algo sale mal
 

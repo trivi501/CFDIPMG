@@ -2,86 +2,31 @@
 
 namespace Database\Seeders;
 
+use App\Support\CatalogoPermisos;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
+/**
+ * Deja los roles de fábrica exactamente como en CatalogoPermisos: solo para una instalación nueva.
+ * En un servidor en uso, `php artisan permisos:sincronizar` agrega lo nuevo sin deshacer los
+ * cambios hechos desde la pantalla de Roles.
+ */
 class RolesAndPermissionsSeeder extends Seeder
 {
-    /**
-     * @var array<string, list<string>>
-     */
-    protected array $roles = [
-        'Admin' => ['*'],
-        'Facturación' => [
-            'receipts.view',
-            'receipts.import',
-            'invoices.view',
-            'invoices.create',
-            'invoices.cancel',
-            'invoices.download',
-            'customers.view',
-            'customers.manage',
-            'products.view',
-            'products.manage',
-            'apoyos.view',
-            'apoyos.view-all',
-            'apoyos.facturar',
-            'apoyos.download-all',
-        ],
-        'Apoyos' => [
-            'apoyos.view',
-            'apoyos.manage',
-        ],
-        'Consulta' => [
-            'receipts.view',
-            'invoices.view',
-            'invoices.download',
-            'customers.view',
-            'products.view',
-            'apoyos.view',
-        ],
-    ];
-
-    /**
-     * @var list<string>
-     */
-    protected array $permissions = [
-        'receipts.view',
-        'receipts.import',
-        'invoices.view',
-        'invoices.create',
-        'invoices.cancel',
-        'invoices.download',
-        'customers.view',
-        'customers.manage',
-        'products.view',
-        'products.manage',
-        'apoyos.view',
-        'apoyos.manage',
-        'apoyos.approve',
-        'apoyos.facturar',
-        'apoyos.view-all',
-        'apoyos.download-all',
-        'users.manage',
-        'roles.manage',
-        'settings.manage',
-        'api-clients.manage',
-    ];
-
     public function run(): void
     {
-        foreach ($this->permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        foreach (CatalogoPermisos::PERMISOS as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => CatalogoPermisos::GUARD]);
         }
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        foreach ($this->roles as $roleName => $permissions) {
-            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+        foreach (array_keys(CatalogoPermisos::ROLES) as $roleName) {
+            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => CatalogoPermisos::GUARD]);
 
-            $role->syncPermissions($permissions === ['*'] ? $this->permissions : $permissions);
+            $role->syncPermissions(CatalogoPermisos::permisosDe($roleName));
         }
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

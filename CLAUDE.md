@@ -33,6 +33,7 @@ npm run build                  # build de producción (Vite)
 
 php artisan migrate            # correr migraciones (MySQL local vía Laragon, ver .env)
 php artisan db:seed            # roles/permisos + usuario admin (ver DatabaseSeeder)
+php artisan permisos:sincronizar [--pretend]   # agrega permisos/roles nuevos del catálogo sin quitar nada
 php artisan app:create-api-client "Nombre"   # genera una API key para que un sistema externo empuje recibos
 php artisan wayfinder:generate --with-form   # regenerar las acciones TS tras cambiar rutas/controllers
 ```
@@ -82,8 +83,11 @@ el frontend (`receipts/invoice.tsx` cambia el label y el resumen de totales seg�
 
 ### Roles y permisos
 
-`spatie/laravel-permission`, sembrados en `RolesAndPermissionsSeeder` (Admin, Facturación,
-Consulta). Las rutas usan middleware `permission:xxx.yyy` (ver `routes/web.php`); los recursos
+`spatie/laravel-permission`. El catálogo de permisos y roles de fábrica (Admin, Facturación, Apoyos,
+Consulta) vive en `App\Support\CatalogoPermisos`: un permiso nuevo se agrega ahí. Lo usan
+`RolesAndPermissionsSeeder` (instalación nueva; deja los roles exactamente de fábrica) y
+`php artisan permisos:sincronizar` (servidores en uso: solo agrega permisos/roles nuevos, nunca quita;
+lo corre `deploy/deploy.sh`). Las rutas usan middleware `permission:xxx.yyy` (ver `routes/web.php`); los recursos
 usan `->middlewareFor([...], 'permission:...')` para separar permisos de lectura (`*.view`) de
 escritura (`*.manage` / `*.create`). En el frontend, `HandleInertiaRequests` comparte
 `auth.permissions`/`auth.roles`, y el hook `usePermissions()` (`resources/js/hooks/use-permissions.ts`)

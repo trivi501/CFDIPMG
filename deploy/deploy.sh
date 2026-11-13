@@ -9,7 +9,8 @@
 # NUNCA BORRA DATOS DE LA BASE:
 #   - Respalda la base antes de empezar; si el respaldo falla, no hace nada.
 #   - Solo corre `php artisan migrate`. Nunca migrate:fresh/refresh/reset/rollback, db:wipe
-#     ni seeders (el seeder regresaría los permisos de los roles a los de fábrica).
+#     ni seeders (el seeder regresaría los permisos de los roles a los de fábrica). Los permisos
+#     nuevos del código llegan con `permisos:sincronizar`, que solo agrega.
 #   - Si una migración pendiente trae DROP, TRUNCATE, DELETE o RENAME, se detiene y deja la versión
 #     anterior funcionando. Para aplicarla a propósito (ya revisada y con respaldo):
 #         PERMITIR_MIGRACION_DESTRUCTIVA=1 bash deploy/deploy.sh
@@ -88,6 +89,12 @@ main() {
         echo "La migración falló. La app sigue en mantenimiento." >&2
         echo "Revisa el error; el respaldo de antes del deploy está en ${BACKUP_DIR:-/var/backups/cfdi}." >&2
         echo "Cuando esté resuelto: php artisan up" >&2
+        exit 1
+    fi
+
+    paso "Sincronizando permisos (solo agrega los nuevos)"
+    if ! php artisan permisos:sincronizar --no-ansi; then
+        echo "No se pudieron sincronizar los permisos. La app sigue en mantenimiento; cuando esté resuelto: php artisan up" >&2
         exit 1
     fi
 
