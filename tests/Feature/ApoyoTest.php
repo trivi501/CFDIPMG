@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Apoyo;
+use App\Models\Area;
 use App\Models\ArticuloFacturaCompra;
 use App\Models\Beneficiario;
 use App\Models\Customer;
@@ -16,6 +17,8 @@ use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class ApoyoTest extends TestCase
@@ -334,6 +337,76 @@ class ApoyoTest extends TestCase
         $this->actingAs($admin)->get("/apoyos/{$apoyo->id}/edit")->assertOk();
     }
 
+    /** Apoyo del usuario con beneficiario, fecha y área dados. */
+    protected function apoyoCon(User $user, string $beneficiario, string $fecha, ?int $areaId = null): Apoyo
+    {
+        $this->actingAs($user)->post('/apoyos', $this->payload([
+            'beneficiario_id' => Beneficiario::create(['nombre' => $beneficiario])->id,
+            'fecha' => $fecha,
+        ]))->assertSessionHasNoErrors();
+
+        $apoyo = Apoyo::latest('id')->firstOrFail();
+        Apoyo::whereKey($apoyo->id)->update(['area_id' => $areaId]);
+
+        return $apoyo;
+    }
+
+    /** @return list<int> */
+    protected function idsListados(User $user, array $filtros): array
+    {
+        $ids = [];
+        $this->actingAs($user)->get('/apoyos?'.http_build_query($filtros))
+            ->assertOk()
+            ->assertInertia(function ($page) use (&$ids) {
+                $ids = collect($page->toArray()['props']['apoyos']['data'])->pluck('id')->sort()->values()->all();
+            });
+
+        return $ids;
+    }
+
+    public function test_filtra_apoyos_por_busqueda_fechas_y_estatus_combinados(): void
+    {
+        $user = $this->apoyosUser();
+        $ana = $this->apoyoCon($user, 'Ana Torres', '2026-08-01');
+        $anaSep = $this->apoyoCon($user, 'Ana Ruiz', '2026-09-15');
+        $luis = $this->apoyoCon($user, 'Luis Gómez', '2026-09-20');
+        Apoyo::whereKey($anaSep->id)->update(['estatus' => Apoyo::ESTATUS_APROBADO]);
+
+        $this->assertSame([$ana->id, $anaSep->id], $this->idsListados($user, ['buscar' => 'ana']));
+        // La persona que apoya (María López) es la misma en los tres.
+        $this->assertCount(3, $this->idsListados($user, ['buscar' => 'maría lópez']));
+        $this->assertSame([$anaSep->id, $luis->id], $this->idsListados($user, ['desde' => '2026-09-01']));
+        $this->assertSame([$ana->id], $this->idsListados($user, ['hasta' => '2026-08-31']));
+        $this->assertSame([$anaSep->id], $this->idsListados($user, [
+            'buscar' => 'ana', 'desde' => '2026-09-01', 'hasta' => '2026-09-30', 'estatus' => 'aprobado',
+        ]));
+        $this->assertSame([], $this->idsListados($user, ['buscar' => 'nadie']));
+    }
+
+    public function test_el_filtro_de_area_solo_aplica_para_quien_ve_todas_las_areas(): void
+    {
+        $admin = $this->adminUser();
+        $areaA = Area::create(['nombre' => 'Desarrollo Social', 'tipo' => 'secretaria']);
+        $areaB = Area::create(['nombre' => 'Regidor Juan', 'tipo' => 'regiduria']);
+        $user = $this->apoyosUser();
+        $enA = $this->apoyoCon($user, 'Ana', '2026-09-01', $areaA->id);
+        $enB = $this->apoyoCon($user, 'Luis', '2026-09-02', $areaB->id);
+
+        $this->assertSame([$enA->id], $this->idsListados($admin, ['area' => $areaA->id]));
+        // Quien solo ve lo suyo no puede usar el filtro para ver otras áreas, ni se le reduce lo que ve.
+        $this->assertSame([$enA->id, $enB->id], $this->idsListados($user, ['area' => $areaA->id]));
+
+        $this->actingAs($user)->get('/apoyos')->assertInertia(fn ($page) => $page->where('areas', []));
+        $this->actingAs($admin)->get('/apoyos')->assertInertia(fn ($page) => $page->has('areas', 2));
+    }
+
+    public function test_un_rango_de_fechas_invertido_no_se_acepta(): void
+    {
+        $this->actingAs($this->apoyosUser())
+            ->get('/apoyos?desde=2026-09-30&hasta=2026-09-01')
+            ->assertSessionHasErrors('hasta');
+    }
+
     public function test_facturar_is_only_allowed_once_an_apoyo_is_aprobado(): void
     {
         $admin = $this->adminUser();
@@ -437,6 +510,63 @@ class ApoyoTest extends TestCase
         $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/aprobar")->assertForbidden();
     }
 
+    public function test_el_rol_apoyos_factura_sus_apoyos_solo_cuando_ya_estan_aprobados(): void
+    {
+        $capturista = $this->apoyosUser();
+        $otro = $this->apoyosUser();
+        $admin = $this->adminUser();
+
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        $apoyo = Apoyo::firstOrFail();
+        $this->fakeFacturapi();
+
+        // Preparado: todavía no se puede facturar, y aprobar sigue siendo del Admin.
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload());
+        $this->assertSame('preparado', $apoyo->refresh()->estatus);
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/aprobar")->assertForbidden();
+
+        $this->actingAs($admin)->patch("/apoyos/{$apoyo->id}/aprobar");
+
+        // Aprobado: otro usuario de Apoyos no puede facturar un apoyo ajeno; el dueño sí.
+        $this->actingAs($otro)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload())->assertForbidden();
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload())
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $this->assertSame('facturado', $apoyo->refresh()->estatus);
+        $this->assertNotNull($apoyo->invoice_id);
+    }
+
+    public function test_facturar_todo_del_rol_apoyos_solo_toma_sus_apoyos_aprobados(): void
+    {
+        $capturista = $this->apoyosUser();
+        $otro = $this->apoyosUser();
+        $admin = $this->adminUser();
+
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        $this->actingAs($otro)->post('/apoyos', $this->payload());
+        [$mio, $ajeno] = Apoyo::orderBy('id')->get()->all();
+        $this->actingAs($admin)->post('/apoyos/aprobar-todo');
+        $this->fakeFacturapi();
+
+        $this->actingAs($capturista)->post('/apoyos/facturar-todo', ['payment_form' => '01'])->assertRedirect();
+
+        $this->assertSame('facturado', $mio->refresh()->estatus);
+        $this->assertSame('aprobado', $ajeno->refresh()->estatus);
+    }
+
+    public function test_la_migracion_da_facturar_al_rol_apoyos_de_un_servidor_en_uso(): void
+    {
+        $apoyos = Role::findByName('Apoyos');
+        $apoyos->revokePermissionTo('apoyos.facturar'); // como estaba antes de este cambio
+
+        (include database_path('migrations/2026_11_13_120000_grant_apoyos_facturar_to_apoyos_role.php'))->up();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->assertTrue($apoyos->fresh()->hasPermissionTo('apoyos.facturar'));
+        $this->assertSame(['apoyos.facturar', 'apoyos.manage', 'apoyos.view'], $apoyos->fresh()->permissions->pluck('name')->sort()->values()->all());
+    }
+
     public function test_aprobar_todo_aprueba_solo_los_preparados(): void
     {
         $capturista = $this->apoyosUser();
@@ -532,7 +662,6 @@ class ApoyoTest extends TestCase
 
         $this->actingAs($capturista)->get('/invoices')->assertForbidden();
         $this->actingAs($capturista)->get('/receipts')->assertForbidden();
-        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload())->assertForbidden();
 
         $this->actingAs($facturacion)->get('/apoyos/create')->assertForbidden();
         $this->actingAs($facturacion)->post('/apoyos', $this->payload())->assertForbidden();

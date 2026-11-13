@@ -59,6 +59,8 @@ final class CatalogoPermisos
         'Apoyos' => [
             'apoyos.view',
             'apoyos.manage',
+            // Factura sus apoyos (o los de su área) una vez que un Admin los aprobó.
+            'apoyos.facturar',
         ],
         'Consulta' => [
             'receipts.view',

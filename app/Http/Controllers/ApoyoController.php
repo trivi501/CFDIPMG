@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Apoyo;
+use App\Models\Area;
 use App\Models\ArticuloFacturaCompra;
 use App\Models\Beneficiario;
 use App\Models\Customer;
@@ -42,9 +43,31 @@ class ApoyoController extends Controller
 
     public function index(Request $request): Response
     {
+        $filtros = $request->validate([
+            'estatus' => ['nullable', 'string', 'in:'.implode(',', [
+                Apoyo::ESTATUS_PREPARADO, Apoyo::ESTATUS_APROBADO, Apoyo::ESTATUS_FACTURADO, Apoyo::ESTATUS_RECHAZADO,
+            ])],
+            'buscar' => ['nullable', 'string', 'max:100'],
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:desde'],
+            'area' => ['nullable', 'integer'],
+        ]);
+        $puedeVerTodo = $request->user()->can('apoyos.view-all');
+
         $apoyos = $this->visibleApoyos($request)
             ->with('beneficiario', 'personaApoya', 'area:id,nombre', 'detalles.articuloFacturaCompra.facturaCompra:id,uuid,emisor,fecha')
-            ->when($request->filled('estatus'), fn (Builder $query) => $query->where('estatus', $request->string('estatus')))
+            ->when($filtros['estatus'] ?? null, fn (Builder $query, string $estatus) => $query->where('estatus', $estatus))
+            ->when(trim($filtros['buscar'] ?? ''), function (Builder $query, string $buscar) {
+                $query->where(function (Builder $query) use ($buscar) {
+                    $query->whereHas('beneficiario', fn (Builder $q) => $q->where('nombre', 'like', "%{$buscar}%"))
+                        ->orWhereHas('personaApoya', fn (Builder $q) => $q->where('nombre', 'like', "%{$buscar}%"))
+                        ->orWhere('rfc', 'like', "%{$buscar}%");
+                });
+            })
+            ->when($filtros['desde'] ?? null, fn (Builder $query, string $desde) => $query->whereDate('fecha', '>=', $desde))
+            ->when($filtros['hasta'] ?? null, fn (Builder $query, string $hasta) => $query->whereDate('fecha', '<=', $hasta))
+            // Quien solo ve su área no necesita este filtro; visibleApoyos ya lo limita.
+            ->when($puedeVerTodo && isset($filtros['area']) ? (int) $filtros['area'] : null, fn (Builder $query, int $area) => $query->where('area_id', $area))
             ->latest('fecha')
             ->paginate(15)
             ->withQueryString()
@@ -61,7 +84,8 @@ class ApoyoController extends Controller
 
         return Inertia::render('apoyos/index', [
             'apoyos' => $apoyos,
-            'filters' => $request->only('estatus'),
+            'filters' => Arr::only($filtros, ['estatus', 'buscar', 'desde', 'hasta', 'area']),
+            'areas' => $puedeVerTodo ? Area::orderBy('nombre')->get(['id', 'nombre']) : [],
             // Cuántos tomarían "Aprobar todo" y "Facturar todo", sin importar el filtro ni la página.
             'pendientes' => [
                 'preparados' => $this->visibleApoyos($request)->where('estatus', Apoyo::ESTATUS_PREPARADO)->count(),

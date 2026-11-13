@@ -84,6 +84,12 @@ class SincronizarPermisos extends Command
             }
         }
 
+        // Siempre se refresca la caché de permisos: así también toman efecto los cambios que hagan
+        // las migraciones de datos que corren antes en el deploy.
+        if (! $pretend) {
+            $registrar->forgetCachedPermissions();
+        }
+
         $sobrantes = array_values(array_diff($existentes, CatalogoPermisos::PERMISOS));
         if ($sobrantes !== []) {
             $this->warn('En la base hay permisos que ya no usa el código (no se borran): '.implode(', ', $sobrantes));

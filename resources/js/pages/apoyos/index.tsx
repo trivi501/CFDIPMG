@@ -11,10 +11,12 @@ import {
     Pencil,
     Plus,
     Receipt,
+    Search,
     Trash2,
+    X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EstatusBadge } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
 import { ImpuestosFields } from '@/components/impuestos-fields';
@@ -40,6 +42,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
@@ -83,9 +86,18 @@ type Apoyo = {
     }[];
 };
 
+type Filtros = {
+    estatus?: string;
+    buscar?: string;
+    desde?: string;
+    hasta?: string;
+    area?: number | string;
+};
+
 type PageProps = {
     apoyos: Paginator<Apoyo>;
-    filters: { estatus?: string };
+    filters: Filtros;
+    areas: { id: number; nombre: string }[];
     pendientes: { preparados: number; aprobados: number };
 };
 
@@ -116,10 +128,52 @@ const currency = new Intl.NumberFormat('es-MX', {
 export default function ApoyosIndex({
     apoyos: paginator,
     filters,
+    areas,
     pendientes,
 }: PageProps) {
     const { can } = usePermissions();
     const puedeVerTodo = can('apoyos.view-all');
+
+    // Filtros en el servidor: cada cambio conserva los demás filtros y regresa a la página 1.
+    const filtrar = (cambios: Filtros) => {
+        const siguientes = { ...filters, ...cambios };
+        const query = Object.fromEntries(
+            Object.entries(siguientes).filter(
+                ([, valor]) =>
+                    valor !== undefined && String(valor).trim() !== '',
+            ),
+        );
+
+        router.get(apoyos.index().url, query, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+    const hayFiltros = Boolean(
+        filters.estatus ||
+        filters.buscar ||
+        filters.desde ||
+        filters.hasta ||
+        filters.area,
+    );
+
+    // La búsqueda espera a que se deje de escribir para no consultar en cada tecla.
+    const [busqueda, setBusqueda] = useState(filters.buscar ?? '');
+    const primeraVez = useRef(true);
+
+    useEffect(() => {
+        if (primeraVez.current) {
+            primeraVez.current = false;
+
+            return;
+        }
+
+        const t = setTimeout(() => filtrar({ buscar: busqueda.trim() }), 350);
+
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [busqueda]);
 
     const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null);
     const [menu, setMenu] = useState<{
@@ -422,6 +476,88 @@ export default function ApoyosIndex({
                     </div>
                 </div>
 
+                <div className="flex flex-wrap items-end gap-2">
+                    <div className="grid w-full gap-1 sm:w-72">
+                        <Label htmlFor="filtro_buscar" className="text-xs">
+                            Buscar
+                        </Label>
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                id="filtro_buscar"
+                                type="search"
+                                value={busqueda}
+                                onChange={(e) => setBusqueda(e.target.value)}
+                                placeholder="Beneficiario, persona que apoya o RFC…"
+                                className="pl-8"
+                            />
+                        </div>
+                    </div>
+                    <div className="grid gap-1">
+                        <Label htmlFor="filtro_desde" className="text-xs">
+                            Desde
+                        </Label>
+                        <Input
+                            id="filtro_desde"
+                            type="date"
+                            value={filters.desde ?? ''}
+                            max={filters.hasta || undefined}
+                            onChange={(e) => filtrar({ desde: e.target.value })}
+                            className="w-40"
+                        />
+                    </div>
+                    <div className="grid gap-1">
+                        <Label htmlFor="filtro_hasta" className="text-xs">
+                            Hasta
+                        </Label>
+                        <Input
+                            id="filtro_hasta"
+                            type="date"
+                            value={filters.hasta ?? ''}
+                            min={filters.desde || undefined}
+                            onChange={(e) => filtrar({ hasta: e.target.value })}
+                            className="w-40"
+                        />
+                    </div>
+                    {puedeVerTodo && areas.length > 0 && (
+                        <div className="grid w-full gap-1 sm:w-56">
+                            <Label htmlFor="filtro_area" className="text-xs">
+                                Área
+                            </Label>
+                            <NativeSelect
+                                id="filtro_area"
+                                value={String(filters.area ?? '')}
+                                onChange={(e) =>
+                                    filtrar({ area: e.target.value })
+                                }
+                            >
+                                <option value="">Todas las áreas</option>
+                                {areas.map((area) => (
+                                    <option key={area.id} value={area.id}>
+                                        {area.nombre}
+                                    </option>
+                                ))}
+                            </NativeSelect>
+                        </div>
+                    )}
+                    {hayFiltros && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setBusqueda('');
+                                router.get(
+                                    apoyos.index().url,
+                                    {},
+                                    { preserveScroll: true, replace: true },
+                                );
+                            }}
+                        >
+                            <X /> Limpiar filtros
+                        </Button>
+                    )}
+                </div>
+
                 <div className="flex flex-wrap items-center gap-1">
                     {[
                         { label: 'Todos', value: undefined },
@@ -438,15 +574,7 @@ export default function ApoyosIndex({
                                     : 'outline'
                             }
                             size="sm"
-                            onClick={() =>
-                                router.get(
-                                    apoyos.index().url,
-                                    option.value
-                                        ? { estatus: option.value }
-                                        : {},
-                                    { preserveState: true },
-                                )
-                            }
+                            onClick={() => filtrar({ estatus: option.value })}
                         >
                             {option.label}
                         </Button>
@@ -517,7 +645,9 @@ export default function ApoyosIndex({
                         <TableBody>
                             {paginator.data.length === 0 && (
                                 <TableEmpty colSpan={conCasillas ? 11 : 10}>
-                                    No hay apoyos registrados.
+                                    {hayFiltros
+                                        ? 'Ningún apoyo coincide con los filtros.'
+                                        : 'No hay apoyos registrados.'}
                                 </TableEmpty>
                             )}
                             {paginator.data.map((apoyo) => (
