@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Actualiza la app en el servidor a la última versión de main (o a un commit de main en particular).
 #
-#   bash deploy/deploy.sh            # último commit de origin/main
-#   bash deploy/deploy.sh <sha>      # un commit específico (debe estar en main)
+#   sudo bash deploy/deploy.sh            # último commit de origin/main
+#   sudo bash deploy/deploy.sh <sha>      # un commit específico (debe estar en main)
 #
-# Se corre como el usuario dueño de la app (deploy), nunca como root.
+# Con sudo, el script se cambia solo al usuario dueño de la carpeta de la app (p. ej. deploy) para
+# no dejar archivos de root que luego la app no pueda escribir. También se puede correr directo
+# como ese usuario, sin sudo.
 #
 # NUNCA BORRA DATOS DE LA BASE:
 #   - Respalda la base antes de empezar; si el respaldo falla, no hace nada.
@@ -13,7 +15,7 @@
 #     nuevos del código llegan con `permisos:sincronizar`, que solo agrega.
 #   - Si una migración pendiente trae DROP, TRUNCATE, DELETE o RENAME, se detiene y deja la versión
 #     anterior funcionando. Para aplicarla a propósito (ya revisada y con respaldo):
-#         PERMITIR_MIGRACION_DESTRUCTIVA=1 bash deploy/deploy.sh
+#         sudo PERMITIR_MIGRACION_DESTRUCTIVA=1 bash deploy/deploy.sh
 #   - No limpia la caché guardada en la base (no usa optimize:clear ni cache:clear).
 #   - No toca el .env ni los archivos subidos: storage/ no está en git y nunca se hace `git clean`.
 
@@ -29,9 +31,10 @@ main() {
     cd "$app_dir"
 
     if [[ $EUID -eq 0 ]]; then
-        echo "No lo corras como root: usa el usuario dueño de la app (p. ej. sudo -u deploy bash deploy/deploy.sh)." >&2
-        exit 1
+        como_dueno "$app_dir" "$@"
     fi
+    local yo
+    yo="$(id -un)"
 
     if [[ $# -gt 0 && ! "$1" =~ ^[0-9a-f]{7,40}$ ]]; then
         echo "\"$1\" no es un SHA de commit válido." >&2
@@ -80,7 +83,7 @@ main() {
     if [[ -n "$destructivas" && -z "${PERMITIR_MIGRACION_DESTRUCTIVA:-}" ]]; then
         echo "Las migraciones pendientes borrarían o renombrarían datos:" >&2
         echo "$destructivas" >&2
-        revertir "$anterior" "migración destructiva sin autorizar (PERMITIR_MIGRACION_DESTRUCTIVA=1)"
+        revertir "$anterior" "migración destructiva sin autorizar (si ya la revisaste: sudo PERMITIR_MIGRACION_DESTRUCTIVA=1 bash deploy/deploy.sh)"
     fi
 
     paso "Migrando la base de datos"
@@ -88,13 +91,14 @@ main() {
         echo >&2
         echo "La migración falló. La app sigue en mantenimiento." >&2
         echo "Revisa el error; el respaldo de antes del deploy está en ${BACKUP_DIR:-/var/backups/cfdi}." >&2
-        echo "Cuando esté resuelto: php artisan up" >&2
+        echo "Cuando esté resuelto: cd $app_dir && sudo -u $yo php artisan up" >&2
         exit 1
     fi
 
     paso "Sincronizando permisos (solo agrega los nuevos)"
     if ! php artisan permisos:sincronizar --no-ansi; then
-        echo "No se pudieron sincronizar los permisos. La app sigue en mantenimiento; cuando esté resuelto: php artisan up" >&2
+        echo "No se pudieron sincronizar los permisos. La app sigue en mantenimiento." >&2
+        echo "Cuando esté resuelto: cd $app_dir && sudo -u $yo php artisan up" >&2
         exit 1
     fi
 
@@ -138,6 +142,37 @@ revertir() {
 
 paso() {
     printf '\n==> %s\n' "$1"
+}
+
+# Corrido con sudo: prepara la carpeta de respaldos y vuelve a lanzar el script como el dueño de la
+# carpeta de la app, con las mismas opciones. Nunca sigue como root.
+como_dueno() {
+    local app_dir="$1"
+    shift
+
+    local dueno
+    dueno="$(stat -c %U "$app_dir")"
+    if [[ "$dueno" == "root" ]]; then
+        echo "La carpeta $app_dir es de root; la app (www-data) no podría escribir en ella." >&2
+        echo "Dásela a un usuario normal, p. ej.: sudo chown -R deploy:www-data $app_dir" >&2
+        exit 1
+    fi
+
+    local backup_dir="${BACKUP_DIR:-/var/backups/cfdi}"
+    if [[ ! -d "$backup_dir" ]]; then
+        install -d -o "$dueno" -g "$dueno" -m 700 "$backup_dir"
+    fi
+
+    # sudo limpia el entorno: se pasan solo las opciones de este script que vengan definidas.
+    local opciones=() var
+    for var in APP_DIR BRANCH BACKUP_DIR FORZAR PERMITIR_MIGRACION_DESTRUCTIVA; do
+        if [[ -n "${!var:-}" ]]; then
+            opciones+=("$var=${!var}")
+        fi
+    done
+
+    echo "Corriendo como $dueno (dueño de $app_dir)…"
+    exec sudo -u "$dueno" -H env "${opciones[@]}" bash "$app_dir/deploy/deploy.sh" "$@"
 }
 
 main "$@"

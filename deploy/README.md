@@ -11,6 +11,12 @@ Todo lo de esta carpeta está pensado para **Ubuntu 24.04** con Nginx, PHP-FPM 8
 
 Los deploys son solo manuales: hacer push a `main` no cambia nada en el servidor.
 
+**Todos los comandos de esta guía se corren en el servidor con `sudo`.** Los de `php artisan` usan
+`sudo -u deploy`, donde `deploy` es el usuario dueño de la carpeta de la app: nunca corras artisan,
+composer ni npm como root, porque dejan archivos que la app no puede escribir. Si tu carpeta es de
+otro usuario o está en otra ruta (p. ej. `/var/www/cfdi.gpe.gob.mx`), cambia `deploy` y
+`/var/www/cfdi` en los comandos. Para saber de quién es: `stat -c %U /var/www/cfdi`.
+
 ## La base de datos nunca se borra
 
 - Antes de cada deploy se hace un respaldo completo; **si el respaldo falla, el deploy no hace nada**.
@@ -18,7 +24,7 @@ Los deploys son solo manuales: hacer push a `main` no cambia nada en el servidor
   ni seeders.
 - Si una migración nueva trae `DROP`, `TRUNCATE`, `DELETE` o `RENAME`, el deploy **se detiene y deja
   funcionando la versión anterior**, sin tocar la base. Para aplicarla a propósito, ya revisada:
-  `PERMITIR_MIGRACION_DESTRUCTIVA=1 bash deploy/deploy.sh`
+  `sudo PERMITIR_MIGRACION_DESTRUCTIVA=1 bash deploy/deploy.sh`
 - El seeder solo corre en la primera instalación (con la tabla `users` vacía). Volver a correrlo
   regresaría los permisos de los roles a los de fábrica.
 - Los permisos nuevos que traiga el código se agregan en cada deploy con
@@ -26,10 +32,14 @@ Los deploys son solo manuales: hacer push a `main` no cambia nada en el servidor
 - El `.env` y los archivos subidos (`storage/`) no se tocan.
 - Respaldo diario a las 2:30 a. m. en `/var/backups/cfdi` (se guardan los últimos 60).
 
-Restaurar un respaldo:
+Ver los respaldos y restaurar uno (reemplaza el contenido actual de la base por el del respaldo):
 
 ```bash
-gunzip < /var/backups/cfdi/cfdipmg-AAAAMMDD-HHMMSS.sql.gz | mysql -u cfdipmg -p cfdipmg
+sudo ls -lh /var/backups/cfdi
+```
+
+```bash
+sudo zcat /var/backups/cfdi/cfdipmg-AAAAMMDD-HHMMSS.sql.gz | sudo mysql cfdipmg
 ```
 
 ## 1. Primera instalación
@@ -61,13 +71,15 @@ Primero sube tus cambios a `main` y revisa que los tests de GitHub (Actions → 
 Luego, en el servidor:
 
 ```bash
-sudo -u deploy bash -c 'cd /var/www/cfdi && bash deploy/deploy.sh'
+cd /var/www/cfdi && sudo bash deploy/deploy.sh
 ```
+
+Con `sudo`, el script se cambia solo al usuario dueño de la carpeta; no hace falta `-u deploy`.
 
 Para desplegar un commit específico de `main` (por ejemplo, regresar a uno anterior), pásale su SHA:
 
 ```bash
-sudo -u deploy bash -c 'cd /var/www/cfdi && bash deploy/deploy.sh 9c2b380'
+cd /var/www/cfdi && sudo bash deploy/deploy.sh 9c2b380
 ```
 
 Regresar el código a un commit anterior no revierte migraciones: la base se queda como está.
@@ -99,9 +111,11 @@ sudo -u deploy bash -c 'cd /var/www/cfdi && php artisan permisos:sincronizar'
   y la base queda intacta.
 - **Falló una migración**: la app se queda en mantenimiento. Revisa el error en la salida; el
   respaldo de justo antes está en `/var/backups/cfdi` (termina en `antes-deploy-<commit>`). Cuando
-  esté resuelto: `php artisan up`.
+  esté resuelto: `cd /var/www/cfdi && sudo -u deploy php artisan up`.
 - **En el navegador: `… is not a function` en una ruta (p. ej. `facturasXml`)**: el frontend se
   compiló con la caché de rutas vieja. Pasa al actualizar a mano (`git pull` + `npm run build`) en
   vez de usar `deploy.sh`. Arreglo:
-  `php artisan route:clear && php artisan config:clear && npm run build && php artisan optimize`
-- Logs: `/var/www/cfdi/storage/logs/` (app y worker), `/var/log/nginx/error.log`.
+  `cd /var/www/cfdi && sudo -u deploy bash -c 'php artisan route:clear && php artisan config:clear && npm run build && php artisan optimize'`
+- Logs: `sudo tail -n 100 /var/www/cfdi/storage/logs/laravel-$(date +%F).log` (app),
+  `sudo tail -n 100 /var/www/cfdi/storage/logs/worker.log` (cola),
+  `sudo tail -n 100 /var/log/nginx/error.log` (Nginx).

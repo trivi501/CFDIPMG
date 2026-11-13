@@ -10,7 +10,8 @@
 #   CONSERVAR   cuántos respaldos guardar    (por omisión 60; los más viejos se eliminan)
 #   ETIQUETA    sufijo para el nombre del archivo, p. ej. "antes-deploy"
 #
-# Restaurar un respaldo:  gunzip < archivo.sql.gz | mysql -u USUARIO -p NOMBRE_BASE
+# Respaldo a mano:        cd /var/www/cfdi && sudo -u deploy bash deploy/backup-db.sh
+# Restaurar un respaldo:  sudo zcat archivo.sql.gz | sudo mysql NOMBRE_BASE
 
 set -euo pipefail
 umask 077
