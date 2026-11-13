@@ -100,4 +100,8 @@ sudo -u deploy bash -c 'cd /var/www/cfdi && php artisan permisos:sincronizar'
 - **Falló una migración**: la app se queda en mantenimiento. Revisa el error en la salida; el
   respaldo de justo antes está en `/var/backups/cfdi` (termina en `antes-deploy-<commit>`). Cuando
   esté resuelto: `php artisan up`.
+- **En el navegador: `… is not a function` en una ruta (p. ej. `facturasXml`)**: el frontend se
+  compiló con la caché de rutas vieja. Pasa al actualizar a mano (`git pull` + `npm run build`) en
+  vez de usar `deploy.sh`. Arreglo:
+  `php artisan route:clear && php artisan config:clear && npm run build && php artisan optimize`
 - Logs: `/var/www/cfdi/storage/logs/` (app y worker), `/var/log/nginx/error.log`.
