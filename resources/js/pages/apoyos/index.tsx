@@ -4,7 +4,10 @@ import {
     CheckCheck,
     CircleCheck,
     CircleX,
+    Download,
     Eye,
+    FileCode,
+    FileText,
     Pencil,
     Plus,
     Receipt,
@@ -68,6 +71,7 @@ type Apoyo = {
     iva: string;
     monto_total: string;
     estatus: Estatus;
+    invoice_id: number | null;
     beneficiario: { nombre: string } | null;
     persona_apoya: { nombre: string } | null;
     area: { nombre: string } | null;
@@ -143,6 +147,9 @@ export default function ApoyosIndex({
     const nombre = (apoyo: Apoyo) =>
         apoyo.beneficiario?.nombre ?? 'Sin beneficiario';
 
+    const facturado = (apoyo: Apoyo) =>
+        apoyo.estatus === 'facturado' && apoyo.invoice_id !== null;
+
     const acciones = (apoyo: Apoyo): Accion[] => {
         const lista: Accion[] = [
             {
@@ -197,6 +204,34 @@ export default function ApoyosIndex({
             });
         }
 
+        if (facturado(apoyo)) {
+            lista.push(
+                {
+                    clave: 'factura-pdf',
+                    etiqueta: 'Factura PDF',
+                    icono: FileText,
+                    ejecutar: () =>
+                        window.open(
+                            apoyos.factura({ apoyo: apoyo.id, formato: 'pdf' })
+                                .url,
+                            '_blank',
+                            'noopener',
+                        ),
+                },
+                {
+                    clave: 'factura-xml',
+                    etiqueta: 'Factura XML',
+                    icono: FileCode,
+                    ejecutar: () => {
+                        window.location.href = apoyos.factura({
+                            apoyo: apoyo.id,
+                            formato: 'xml',
+                        }).url;
+                    },
+                },
+            );
+        }
+
         if (can('apoyos.manage')) {
             lista.push(
                 {
@@ -228,12 +263,14 @@ export default function ApoyosIndex({
         return lista;
     };
 
-    // Casillas para elegir cuáles aprobar o facturar. Solo se pueden marcar los que el usuario
-    // puede mover de estatus: preparados (si aprueba) y aprobados (si factura).
+    // Casillas para elegir cuáles aprobar, facturar o descargar. Se pueden marcar los que el usuario
+    // puede mover de estatus (preparados si aprueba, aprobados si factura) y los ya facturados, para
+    // descargar sus XML; esto último lo puede hacer cualquiera que vea el apoyo.
     const seleccionable = (apoyo: Apoyo) =>
         (apoyo.estatus === 'preparado' && can('apoyos.approve')) ||
-        (apoyo.estatus === 'aprobado' && can('apoyos.facturar'));
-    const conCasillas = can('apoyos.approve') || can('apoyos.facturar');
+        (apoyo.estatus === 'aprobado' && can('apoyos.facturar')) ||
+        facturado(apoyo);
+    const conCasillas = true;
     const [seleccion, setSeleccion] = useState<number[]>([]);
     const marcables = paginator.data.filter(seleccionable);
     const marcados = marcables.filter((apoyo) => seleccion.includes(apoyo.id));
@@ -243,6 +280,7 @@ export default function ApoyosIndex({
     const aprobadosMarcados = marcados.filter(
         (apoyo) => apoyo.estatus === 'aprobado',
     );
+    const facturadosMarcados = marcados.filter(facturado);
     const haySeleccion = marcados.length > 0;
     const todosMarcados =
         marcables.length > 0 && marcados.length === marcables.length;
@@ -320,6 +358,27 @@ export default function ApoyosIndex({
                         }
                     />
                     <div className="flex flex-wrap gap-2">
+                        {facturadosMarcados.length > 0 && (
+                            <Button variant="outline" asChild>
+                                <a
+                                    href={
+                                        apoyos.facturasXml({
+                                            query: {
+                                                ids: facturadosMarcados.map(
+                                                    (apoyo) => apoyo.id,
+                                                ),
+                                            },
+                                        }).url
+                                    }
+                                >
+                                    <Download />
+                                    Descargar XML seleccionados
+                                    <Badge variant="secondary">
+                                        {facturadosMarcados.length}
+                                    </Badge>
+                                </a>
+                            </Button>
+                        )}
                         {puedeVerTodo && (
                             <Button variant="outline" asChild>
                                 <a href={apoyos.descargarXmls().url}>

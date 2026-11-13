@@ -386,8 +386,8 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                     )}
                                 </p>
                             </div>
-                            {can('invoices.view') && (
-                                <div className="flex items-end gap-2">
+                            <div className="flex items-end gap-2">
+                                {can('invoices.view') && (
                                     <Button variant="outline" asChild>
                                         <Link
                                             href={invoices.show(apoyo.invoice)}
@@ -395,36 +395,38 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                             Ver factura
                                         </Link>
                                     </Button>
-                                    {can('invoices.download') && (
-                                        <>
-                                            <Button variant="outline" asChild>
-                                                <a
-                                                    href={
-                                                        invoices.pdf(
-                                                            apoyo.invoice,
-                                                        ).url
-                                                    }
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                >
-                                                    PDF
-                                                </a>
-                                            </Button>
-                                            <Button variant="outline" asChild>
-                                                <a
-                                                    href={
-                                                        invoices.xml(
-                                                            apoyo.invoice,
-                                                        ).url
-                                                    }
-                                                >
-                                                    XML
-                                                </a>
-                                            </Button>
-                                        </>
-                                    )}
-                                </div>
-                            )}
+                                )}
+                                {apoyo.invoice.uuid && (
+                                    <>
+                                        <Button variant="outline" asChild>
+                                            <a
+                                                href={
+                                                    apoyos.factura({
+                                                        apoyo: apoyo.id,
+                                                        formato: 'pdf',
+                                                    }).url
+                                                }
+                                                target="_blank"
+                                                rel="noreferrer"
+                                            >
+                                                PDF
+                                            </a>
+                                        </Button>
+                                        <Button variant="outline" asChild>
+                                            <a
+                                                href={
+                                                    apoyos.factura({
+                                                        apoyo: apoyo.id,
+                                                        formato: 'xml',
+                                                    }).url
+                                                }
+                                            >
+                                                XML
+                                            </a>
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                 )}

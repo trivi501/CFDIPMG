@@ -548,6 +548,90 @@ class ApoyoTest extends TestCase
         $this->assertSame('facturado', $apoyo->refresh()->estatus);
     }
 
+    /** Un apoyo capturado por $owner y facturado por el admin. */
+    protected function apoyoFacturado(User $owner, string $uuid = 'uuid-apoyo-1'): Apoyo
+    {
+        $this->actingAs($owner)->post('/apoyos', $this->payload());
+        $apoyo = Apoyo::latest('id')->firstOrFail();
+
+        $customer = Customer::firstOrCreate(
+            ['rfc' => 'XAXX010101000'],
+            ['legal_name' => 'PUBLICO EN GENERAL', 'tax_system' => '616', 'zip' => '01000'],
+        );
+
+        $invoice = Invoice::create([
+            'customer_id' => $customer->id,
+            'facturapi_invoice_id' => 'fact_'.$uuid,
+            'uuid' => $uuid,
+            'series' => 'F',
+            'folio' => (string) $apoyo->id,
+            'total' => 600,
+            'status' => 'valid',
+        ]);
+        $apoyo->update(['estatus' => Apoyo::ESTATUS_FACTURADO, 'invoice_id' => $invoice->id]);
+
+        return $apoyo;
+    }
+
+    public function test_el_rol_apoyos_descarga_el_pdf_y_xml_de_sus_apoyos_facturados(): void
+    {
+        $owner = $this->apoyosUser();
+        $other = $this->apoyosUser();
+        $apoyo = $this->apoyoFacturado($owner);
+
+        Http::fake([
+            'www.facturapi.io/v2/invoices/*/pdf' => Http::response('%PDF-1.4 apoyo', 200),
+            'www.facturapi.io/v2/invoices/*/xml' => Http::response('<cfdi:Comprobante/>', 200),
+        ]);
+
+        $this->actingAs($owner)->get("/apoyos/{$apoyo->id}/factura/pdf")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf');
+        $this->assertSame('<cfdi:Comprobante/>', $this->actingAs($owner)->get("/apoyos/{$apoyo->id}/factura/xml")->assertOk()->getContent());
+
+        // No tiene invoices.download: la ruta general de facturas le sigue cerrada.
+        $this->actingAs($owner)->get("/invoices/{$apoyo->invoice_id}/pdf")->assertForbidden();
+        // Ni puede bajar la factura de un apoyo ajeno.
+        $this->actingAs($other)->get("/apoyos/{$apoyo->id}/factura/xml")->assertForbidden();
+        $this->actingAs($owner)->get("/apoyos/{$apoyo->id}/factura/zip")->assertNotFound();
+    }
+
+    public function test_un_apoyo_sin_factura_timbrada_no_tiene_pdf_ni_xml(): void
+    {
+        $owner = $this->apoyosUser();
+        $this->actingAs($owner)->post('/apoyos', $this->payload());
+        $apoyo = Apoyo::firstOrFail();
+
+        $this->actingAs($owner)->get("/apoyos/{$apoyo->id}/factura/pdf")->assertNotFound();
+    }
+
+    public function test_descarga_masiva_de_xml_solo_incluye_los_apoyos_seleccionados_que_el_usuario_ve(): void
+    {
+        $owner = $this->apoyosUser();
+        $other = $this->apoyosUser();
+        $mio1 = $this->apoyoFacturado($owner, 'uuid-mio-1');
+        $mio2 = $this->apoyoFacturado($owner, 'uuid-mio-2');
+        $mio3 = $this->apoyoFacturado($owner, 'uuid-mio-3');
+        $ajeno = $this->apoyoFacturado($other, 'uuid-ajeno');
+
+        Http::fake(['www.facturapi.io/v2/invoices/*/xml' => Http::response('<cfdi:Comprobante/>', 200)]);
+
+        $response = $this->actingAs($owner)
+            ->get('/apoyos/facturas-xml?'.http_build_query(['ids' => [$mio1->id, $mio2->id, $ajeno->id]]))
+            ->assertOk();
+
+        $zip = new \ZipArchive;
+        $zip->open($response->baseResponse->getFile()->getPathname());
+        $nombres = collect(range(0, $zip->numFiles - 1))->map(fn (int $i) => $zip->getNameIndex($i))->sort()->values()->all();
+        $zip->close();
+
+        // El tercero no se marcó y el ajeno no lo ve: ninguno entra al ZIP.
+        $this->assertSame(["F{$mio1->id}-uuid-mio-1.xml", "F{$mio2->id}-uuid-mio-2.xml"], $nombres);
+        $this->assertNotNull($mio3->invoice_id);
+
+        $this->actingAs($owner)->get('/apoyos/facturas-xml?'.http_build_query(['ids' => [$ajeno->id]]))->assertNotFound();
+    }
+
     public function test_a_user_can_view_their_own_apoyo_but_not_someone_elses(): void
     {
         $owner = $this->apoyosUser();

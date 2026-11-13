@@ -10,6 +10,7 @@ use App\Models\DetalleApoyo;
 use App\Models\FacturaCompra;
 use App\Models\Paquete;
 use App\Models\PersonaApoya;
+use App\Services\Facturapi\FacturapiClient;
 use App\Services\InvoiceService;
 use App\Support\ImpuestosFactura;
 use App\Support\UsoCfdi;
@@ -20,12 +21,14 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 use ZipArchive;
 
 class ApoyoController extends Controller
@@ -137,6 +140,36 @@ class ApoyoController extends Controller
         abort_unless($path !== null && Storage::disk('local')->exists($path), 404);
 
         return Storage::disk('local')->response($path, null, ['X-Content-Type-Options' => 'nosniff']);
+    }
+
+    /**
+     * PDF o XML de la factura de un apoyo. Usa el mismo acceso que ver el apoyo (quien lo capturó,
+     * su área o apoyos.view-all), así el rol Apoyos descarga lo suyo sin invoices.download, que le
+     * abriría todas las facturas del sistema.
+     */
+    public function factura(Request $request, Apoyo $apoyo, string $formato, FacturapiClient $facturapi): HttpResponse
+    {
+        $this->authorizeAccess($request, $apoyo);
+
+        $invoice = $apoyo->invoice;
+
+        abort_unless(
+            $invoice !== null && $invoice->facturapi_invoice_id !== null && $invoice->uuid !== null,
+            404,
+            'Este apoyo no tiene una factura timbrada.'
+        );
+
+        if ($formato === 'pdf') {
+            return response($facturapi->downloadPdf($invoice->facturapi_invoice_id)->body(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="factura-'.$invoice->folio.'.pdf"',
+            ]);
+        }
+
+        return response($facturapi->downloadXml($invoice->facturapi_invoice_id)->body(), 200, [
+            'Content-Type' => 'application/xml',
+            'Content-Disposition' => 'attachment; filename="factura-'.$invoice->folio.'.xml"',
+        ]);
     }
 
     public function edit(Request $request, Apoyo $apoyo): Response
@@ -390,6 +423,59 @@ class ApoyoController extends Controller
             'quantity' => (float) $detalle->cantidad,
             'unit_price' => (float) $detalle->costo_unidad,
         ])->all());
+    }
+
+    /**
+     * ZIP con los XML de las facturas emitidas para los apoyos marcados en la tabla. Solo toma los
+     * que el usuario puede ver y que ya tienen factura timbrada; los demás ids se ignoran.
+     */
+    public function facturasXml(Request $request, FacturapiClient $facturapi): BinaryFileResponse|HttpResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:'.InvoiceController::MAX_XMLS],
+            'ids.*' => ['integer'],
+        ]);
+
+        $apoyos = $this->visibleApoyos($request)
+            ->whereIn('id', $data['ids'])
+            ->whereHas('invoice', fn (Builder $query) => $query->whereNotNull('facturapi_invoice_id')->whereNotNull('uuid'))
+            ->with('invoice', 'beneficiario:id,nombre')
+            ->get();
+
+        if ($apoyos->isEmpty()) {
+            return response('Ninguno de los apoyos seleccionados tiene una factura timbrada.', 404);
+        }
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'apoyos-facturas-xml');
+
+        if ($zipPath === false) {
+            abort(500, 'No se pudo preparar el archivo ZIP.');
+        }
+
+        $zip = new ZipArchive;
+        $zip->open($zipPath, ZipArchive::OVERWRITE);
+        $errores = [];
+
+        foreach ($apoyos as $apoyo) {
+            $invoice = $apoyo->invoice;
+            $nombre = trim(($invoice->series ?? '').($invoice->folio ?? '').'-'.$invoice->uuid, '-').'.xml';
+
+            try {
+                $zip->addFromString($nombre, $facturapi->downloadXml((string) $invoice->facturapi_invoice_id)->body());
+            } catch (Throwable $e) {
+                Log::warning('No se pudo descargar el XML de la factura del apoyo', ['apoyo_id' => $apoyo->id, 'error' => $e->getMessage()]);
+                $errores[] = "{$nombre}: {$e->getMessage()}";
+            }
+        }
+
+        if ($errores !== []) {
+            $zip->addFromString('ERRORES.txt', "No se pudieron descargar estos XML:\n\n".implode("\n", $errores)."\n");
+        }
+
+        $zip->close();
+
+        return response()->download($zipPath, 'facturas-apoyos-'.now('America/Mexico_City')->format('Y-m-d').'.zip')
+            ->deleteFileAfterSend();
     }
 
     public function descargarXmls(Request $request): BinaryFileResponse|HttpResponse

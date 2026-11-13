@@ -96,6 +96,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('facturas-compra', [FacturaCompraController::class, 'index'])->name('facturas-compra.index');
         Route::get('facturas-compra/{factura}/xml', [FacturaCompraController::class, 'xml'])->name('facturas-compra.xml');
         Route::get('apoyos/{apoyo}/documentos/{tipo}', [ApoyoController::class, 'documento'])->name('apoyos.documento');
+        Route::get('apoyos/{apoyo}/factura/{formato}', [ApoyoController::class, 'factura'])
+            ->whereIn('formato', ['pdf', 'xml'])
+            ->name('apoyos.factura');
         Route::post('facturas-compra', [FacturaCompraController::class, 'store'])
             ->middleware('permission:apoyos.manage')
             ->name('facturas-compra.store');
@@ -105,6 +108,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('apoyos/facturar-todo', [ApoyoController::class, 'facturarTodo'])
             ->middleware('permission:apoyos.facturar')
             ->name('apoyos.facturar-todo');
+        Route::get('apoyos/facturas-xml', [ApoyoController::class, 'facturasXml'])
+            ->name('apoyos.facturas-xml');
         Route::get('apoyos/descargar-xmls', [ApoyoController::class, 'descargarXmls'])
             ->middleware('permission:apoyos.download-all')
             ->name('apoyos.descargar-xmls');
