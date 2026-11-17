@@ -697,7 +697,8 @@ class ApoyoController extends Controller
             'detalles' => ['required', 'array', 'min:1'],
             'detalles.*.articulo_factura_compra_id' => ['nullable', 'integer', 'exists:articulos_factura_compra,id'],
             'detalles.*.cantidad' => ['required', 'numeric', 'min:0.01'],
-            'detalles.*.articulo' => ['required', 'string', 'max:255'],
+            // Hasta 1000: la Descripcion de un concepto de CFDI admite ese largo (ver la migración widen_articulo_descripcion).
+            'detalles.*.articulo' => ['required', 'string', 'max:1000'],
             'detalles.*.costo_unidad' => ['required', 'numeric', 'min:0'],
             'detalles.*.iva' => ['nullable', 'numeric', 'min:0'],
         ]);

@@ -123,6 +123,19 @@ class ApoyoTest extends TestCase
         $this->assertSame('preparado', $apoyo->estatus);
     }
 
+    public function test_un_detalle_acepta_descripciones_de_hasta_1000_caracteres(): void
+    {
+        $user = $this->apoyosUser();
+        $detalle = fn (int $largo) => [['cantidad' => 1, 'articulo' => str_repeat('a', $largo), 'costo_unidad' => 10, 'iva' => 0]];
+
+        $this->actingAs($user)->post('/apoyos', $this->payload(['detalles' => $detalle(1000)]))
+            ->assertSessionHasNoErrors();
+        $this->assertSame(1000, mb_strlen(Apoyo::firstOrFail()->detalles()->firstOrFail()->articulo));
+
+        $this->actingAs($user)->post('/apoyos', $this->payload(['detalles' => $detalle(1001)]))
+            ->assertSessionHasErrors('detalles.0.articulo');
+    }
+
     public function test_it_stores_the_uploaded_solicitud_recibo_file(): void
     {
         Storage::fake('local');

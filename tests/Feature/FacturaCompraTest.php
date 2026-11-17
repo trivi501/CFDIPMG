@@ -76,6 +76,29 @@ class FacturaCompraTest extends TestCase
         Storage::disk('local')->assertExists($factura->xml_path);
     }
 
+    /**
+     * El SAT admite descripciones de hasta 1000 caracteres; con columnas de 255, MySQL rechazaba el
+     * XML ("Data too long for column 'descripcion'"). SQLite no valida largos, así que aquí se revisa
+     * que se guarde completa y que las columnas declaren el largo correcto.
+     */
+    public function test_registra_conceptos_con_descripciones_largas_del_sat(): void
+    {
+        $larga = str_repeat('Kit de despensa con arroz, frijol, aceite y básicos. ', 18); // ~950 caracteres
+        $xml = str_replace('Descripcion="Despensa"', 'Descripcion="'.trim($larga).'"', $this->cfdiXml());
+
+        $this->actingAs($this->apoyosUser())
+            ->postJson('/facturas-compra', ['xml' => UploadedFile::fake()->createWithContent('factura.xml', $xml)])
+            ->assertOk();
+
+        $this->assertSame(trim($larga), FacturaCompra::firstOrFail()->articulos()->orderBy('id')->firstOrFail()->descripcion);
+
+        $migracion = (string) file_get_contents(database_path('migrations/2026_11_17_090000_widen_articulo_descripcion_columns.php'));
+        foreach (["'articulos_factura_compra'", "'paquete_articulos'", "'detalle_apoyos'"] as $tabla) {
+            $this->assertStringContainsString($tabla, $migracion);
+        }
+        $this->assertStringContainsString('LARGO = 1000', $migracion);
+    }
+
     public function test_parsing_a_non_cfdi_xml_returns_a_422_with_a_message(): void
     {
         $file = UploadedFile::fake()->createWithContent('factura.xml', '<?xml version="1.0"?><root><foo>bar</foo></root>');
