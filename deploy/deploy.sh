@@ -53,8 +53,11 @@ main() {
         exit 1
     fi
 
-    if [[ "$destino" == "$anterior" && -z "${FORZAR:-}" ]]; then
-        echo "Ya está desplegado $destino. Nada que hacer (FORZAR=1 para reconstruir de todos modos)."
+    # Se compara contra el último deploy que TERMINÓ bien, no contra el commit actual: si alguien hizo
+    # `git pull` a mano, el código ya está en el commit pero sin composer install, build ni cachés.
+    local marca="$app_dir/storage/framework/ultimo-deploy"
+    if [[ "$destino" == "$(cat "$marca" 2>/dev/null)" && -z "${FORZAR:-}" ]]; then
+        echo "Ya está desplegado $destino. Nada que hacer (sudo FORZAR=1 bash deploy/deploy.sh para reconstruir de todos modos)."
         exit 0
     fi
 
@@ -107,6 +110,7 @@ main() {
     php artisan queue:restart --no-ansi
 
     php artisan up
+    echo "$destino" > "$marca"
     paso "Listo: desplegado ${destino:0:7}"
 }
 
@@ -153,8 +157,15 @@ como_dueno() {
     local dueno
     dueno="$(stat -c %U "$app_dir")"
     if [[ "$dueno" == "root" ]]; then
+        local usuario="${SUDO_USER:-deploy}"
+        [[ "$usuario" == "root" ]] && usuario="deploy"
         echo "La carpeta $app_dir es de root; la app (www-data) no podría escribir en ella." >&2
-        echo "Dásela a un usuario normal, p. ej.: sudo chown -R deploy:www-data $app_dir" >&2
+        echo "No se cambió nada. Dásela a un usuario normal ($usuario) y vuelve a correr el deploy:" >&2
+        echo "  sudo usermod -aG www-data $usuario" >&2
+        echo "  sudo chown -R $usuario:www-data $app_dir" >&2
+        echo "  sudo find $app_dir/storage $app_dir/bootstrap/cache -type d -exec chmod 2775 {} +" >&2
+        echo "  sudo find $app_dir/storage $app_dir/bootstrap/cache -type f -exec chmod 664 {} +" >&2
+        echo "  sudo chmod 640 $app_dir/.env" >&2
         exit 1
     fi
 
