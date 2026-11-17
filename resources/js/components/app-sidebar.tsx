@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import {
     Boxes,
+    Bug,
     Building2,
     FileCheck2,
     FileText,
@@ -143,6 +144,12 @@ export function AppSidebar() {
             title: 'Bitácora de auditoría',
             href: auditoria.index(),
             icon: ScrollText,
+        });
+        adminNavItems.push({
+            title: 'Logs de errores',
+            href: '/log-viewer',
+            icon: Bug,
+            externa: true,
         });
     }
 

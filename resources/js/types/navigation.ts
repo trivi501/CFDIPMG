@@ -11,4 +11,6 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** Página fuera de Inertia (p. ej. el visor de logs): se abre en otra pestaña con un enlace normal. */
+    externa?: boolean;
 };

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Apoyo;
 use App\Models\Area;
 use App\Models\ArticuloFacturaCompra;
+use App\Models\Auditoria;
 use App\Models\Beneficiario;
 use App\Models\Customer;
 use App\Models\FacturaCompra;
@@ -723,6 +724,25 @@ class ApoyoTest extends TestCase
         // Ni puede bajar la factura de un apoyo ajeno.
         $this->actingAs($other)->get("/apoyos/{$apoyo->id}/factura/xml")->assertForbidden();
         $this->actingAs($owner)->get("/apoyos/{$apoyo->id}/factura/zip")->assertNotFound();
+    }
+
+    public function test_las_descargas_de_facturas_de_apoyos_quedan_en_la_bitacora(): void
+    {
+        $owner = $this->apoyosUser();
+        $apoyo = $this->apoyoFacturado($owner);
+        Http::fake([
+            'www.facturapi.io/v2/invoices/*/pdf' => Http::response('%PDF-1.4', 200),
+            'www.facturapi.io/v2/invoices/*/xml' => Http::response('<cfdi:Comprobante/>', 200),
+        ]);
+        Auditoria::query()->delete();
+
+        $this->actingAs($owner)->get("/apoyos/{$apoyo->id}/factura/pdf")->assertOk();
+        $this->actingAs($owner)->get('/apoyos/facturas-xml?'.http_build_query(['ids' => [$apoyo->id]]))->assertOk();
+
+        $this->assertSame(
+            ['Factura de apoyo (pdf)', 'ZIP con XML de facturas de apoyos seleccionados'],
+            Auditoria::where('accion', 'descarga')->orderBy('id')->pluck('descripcion')->all(),
+        );
     }
 
     public function test_un_apoyo_sin_factura_timbrada_no_tiene_pdf_ni_xml(): void

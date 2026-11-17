@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Opcodes\LogViewer\Facades\LogViewer;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -23,9 +24,14 @@ class RegistrarConsultaAuditoria
         'facturas-compra.xml' => ['descarga', 'XML de factura de compra', 'facturas_compra', 'factura'],
         'apoyos.documento' => ['descarga', 'Documento de apoyo', 'apoyos', 'apoyo'],
         'apoyos.descargar-xmls' => ['descarga', 'ZIP con los XML de apoyos', 'apoyos', null],
+        'apoyos.factura' => ['descarga', 'Factura de apoyo', 'apoyos', 'apoyo'],
+        'apoyos.facturas-xml' => ['descarga', 'ZIP con XML de facturas de apoyos seleccionados', 'apoyos', null],
+        'log-viewer.files.download' => ['descarga', 'Log del sistema', null, null],
+        'log-viewer.folders.download' => ['descarga', 'Carpeta de logs del sistema', null, null],
     ];
 
-    private const OMITIR = ['_token', '_method', 'password', 'password_confirmation'];
+    /** La firma de los enlaces de descarga de logs no aporta nada a la bitácora. */
+    private const OMITIR = ['_token', '_method', 'password', 'password_confirmation', 'signature', 'expires'];
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -50,8 +56,16 @@ class RegistrarConsultaAuditoria
             $descripcion .= ' '.trim(($factura->series ?? '').' '.($factura->folio ?? $factura->uuid ?? ''));
         }
 
-        if ($request->route('tipo') !== null) {
-            $descripcion .= ' ('.$request->route('tipo').')';
+        foreach (['tipo', 'formato'] as $detalle) {
+            if (is_string($request->route($detalle))) {
+                $descripcion .= ' ('.$request->route($detalle).')';
+            }
+        }
+
+        if (is_string($archivo = $request->route('fileIdentifier'))) {
+            $descripcion .= ' '.(LogViewer::getFile($archivo)->name ?? $archivo);
+        } elseif (is_string($carpeta = $request->route('folderIdentifier'))) {
+            $descripcion .= ' '.(LogViewer::getFolder($carpeta)?->cleanPath() ?? $carpeta);
         }
 
         $parametros = collect($request->query())

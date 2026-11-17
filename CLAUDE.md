@@ -108,6 +108,17 @@ el rol Admin (por rol, no por permiso, para que no se pueda otorgar). Al agregar
 nombre legible va en `AuditoriaController::MODULOS`. La app guarda en UTC y la pantalla muestra y
 filtra en hora de Ciudad de México.
 
+### Visor de logs
+
+`/log-viewer` (paquete `opcodesio/log-viewer`, config en `config/log-viewer.php`) muestra los logs de
+`storage/logs`. Solo el rol Admin, por el gate `viewLogViewer` de `AppServiceProvider` (por rol, igual
+que la bitácora); los gates `deleteLogFile`/`deleteLogFolder` siempre niegan, así que nadie borra logs
+desde la pantalla. Su índice va en caché de archivos (`cache_driver`), no en la base. Sus rutas de API
+no pasan por el grupo `web`: por eso `RegistrarConsultaAuditoria` está en `api_middleware` para que las
+descargas de logs queden en la bitácora. El enlace del menú es una `NavItem` con `externa: true` porque
+no es una página de Inertia. En producción, `APP_URL` debe coincidir con el dominio real o la API del
+visor responde 401.
+
 ### Wayfinder (rutas/acciones tipadas)
 
 `resources/js/actions/**` y `resources/js/routes/**` están **gitignored** y se regeneran solos
