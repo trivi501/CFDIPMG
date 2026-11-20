@@ -11,6 +11,7 @@ import {
     Pencil,
     Plus,
     Receipt,
+    RotateCcw,
     Search,
     Trash2,
     X,
@@ -231,6 +232,27 @@ export default function ApoyosIndex({
                         }),
                 },
             );
+        }
+
+        if (apoyo.estatus === 'rechazado' && can('apoyos.manage')) {
+            lista.push({
+                clave: 'reabrir',
+                etiqueta: 'Regresar a preparado',
+                icono: RotateCcw,
+                ejecutar: () =>
+                    setConfirmacion({
+                        titulo: 'Regresar a preparado',
+                        descripcion: `¿Regresar el apoyo de "${nombre(apoyo)}" a "Preparado" para que se vuelva a revisar? Se vuelven a apartar sus artículos del inventario.`,
+                        boton: 'Regresar a preparado',
+                        destructiva: false,
+                        alConfirmar: () =>
+                            router.patch(
+                                apoyos.reabrir(apoyo).url,
+                                {},
+                                { preserveScroll: true },
+                            ),
+                    }),
+            });
         }
 
         if (apoyo.estatus === 'aprobado' && can('apoyos.facturar')) {

@@ -147,6 +147,18 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
         router.patch(apoyos.rechazar(apoyo).url, {}, { preserveScroll: true });
     };
 
+    const regresarAPreparado = () => {
+        if (
+            !confirm(
+                '¿Regresar este apoyo a "Preparado" para que se vuelva a revisar? Se vuelven a apartar sus artículos del inventario.',
+            )
+        ) {
+            return;
+        }
+
+        router.patch(apoyos.reabrir(apoyo).url, {}, { preserveScroll: true });
+    };
+
     const facturarForm = useForm({
         rfc: apoyo.rfc || 'XAXX010101000',
         legal_name: apoyo.beneficiario?.nombre ?? 'PUBLICO EN GENERAL',
@@ -187,6 +199,12 @@ export default function ApoyoShow({ apoyo }: { apoyo: Apoyo }) {
                                         Rechazado
                                     </Button>
                                 </>
+                            )}
+                        {apoyo.estatus === 'rechazado' &&
+                            can('apoyos.manage') && (
+                                <Button onClick={regresarAPreparado}>
+                                    Regresar a preparado
+                                </Button>
                             )}
                         {can('apoyos.manage') && (
                             <Button variant="outline" asChild>

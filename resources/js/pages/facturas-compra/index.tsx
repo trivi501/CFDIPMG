@@ -1,14 +1,16 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Upload } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
 import type { ComboboxOption } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import {
     Table,
     TableBody,
@@ -38,6 +40,8 @@ type Factura = {
     fecha: string | null;
     total: string;
     xml_path: string;
+    area_id: number | null;
+    area: { id: number; nombre: string } | null;
     articulos: Articulo[];
 };
 
@@ -48,10 +52,22 @@ const currency = new Intl.NumberFormat('es-MX', {
 
 export default function FacturasCompraIndex({
     facturas,
+    areas,
+    puedeAsignarArea,
 }: {
     facturas: Factura[];
+    areas: { id: number; nombre: string }[];
+    puedeAsignarArea: boolean;
 }) {
     const { can } = usePermissions();
+    const sinArea = facturas.filter((factura) => factura.area_id === null);
+
+    const asignarArea = (factura: Factura, areaId: string) =>
+        router.patch(
+            facturasCompra.area(factura.id).url,
+            { area_id: areaId === '' ? null : Number(areaId) },
+            { preserveScroll: true },
+        );
     const { data, setData, post, processing, errors, reset } = useForm({
         xml: null as File | null,
     });
@@ -120,6 +136,14 @@ export default function FacturasCompraIndex({
                     </Card>
                 )}
 
+                {puedeAsignarArea && sinArea.length > 0 && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                        <strong>{sinArea.length}</strong> factura(s) sin área.
+                        Solo las ven Admin y Facturación hasta que les asignes
+                        el área (regiduría o secretaría) a la que pertenecen.
+                    </div>
+                )}
+
                 {facturas.length === 0 && (
                     <p className="text-sm text-muted-foreground">
                         No hay facturas de compra registradas.
@@ -162,13 +186,49 @@ export default function FacturasCompraIndex({
                                         {fechaMx(factura.fecha)}
                                     </span>
                                 )}
+                                {!puedeAsignarArea && factura.area && (
+                                    <Badge variant="outline" className="ml-2">
+                                        {factura.area.nombre}
+                                    </Badge>
+                                )}
                             </CardTitle>
-                            <a
-                                href={facturasCompra.xml(factura.id).url}
-                                className="text-sm text-primary underline"
-                            >
-                                Descargar XML
-                            </a>
+                            <div className="flex flex-wrap items-center gap-3">
+                                {puedeAsignarArea && (
+                                    <div className="w-64">
+                                        <NativeSelect
+                                            aria-label={`Área de la factura de ${factura.emisor ?? 'compra'}`}
+                                            value={String(
+                                                factura.area_id ?? '',
+                                            )}
+                                            onChange={(e) =>
+                                                asignarArea(
+                                                    factura,
+                                                    e.target.value,
+                                                )
+                                            }
+                                        >
+                                            <option value="">
+                                                Sin área (solo Admin y
+                                                Facturación)
+                                            </option>
+                                            {areas.map((area) => (
+                                                <option
+                                                    key={area.id}
+                                                    value={area.id}
+                                                >
+                                                    {area.nombre}
+                                                </option>
+                                            ))}
+                                        </NativeSelect>
+                                    </div>
+                                )}
+                                <a
+                                    href={facturasCompra.xml(factura.id).url}
+                                    className="text-sm text-primary underline"
+                                >
+                                    Descargar XML
+                                </a>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-x-auto rounded-lg border">

@@ -200,9 +200,12 @@ class ApoyoTest extends TestCase
         $this->assertDatabaseCount('detalle_apoyos', 0);
     }
 
-    protected function articuloFacturaCompra(float $cantidadTotal = 10, float $costoUnidad = 50): ArticuloFacturaCompra
+    /** Artículo de una factura de compra del usuario indicado (solo él, su área o Admin lo ven). */
+    protected function articuloFacturaCompra(float $cantidadTotal = 10, float $costoUnidad = 50, ?User $dueno = null): ArticuloFacturaCompra
     {
         $factura = FacturaCompra::create([
+            'user_id' => $dueno?->id,
+            'area_id' => $dueno?->area_id,
             'xml_path' => 'facturas-compra/fake.xml',
             'emisor' => 'Proveedor de prueba',
             'fecha' => '2026-08-01',
@@ -220,9 +223,10 @@ class ApoyoTest extends TestCase
 
     public function test_creating_an_apoyo_from_an_articulo_factura_compra_deducts_available_stock(): void
     {
-        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
+        $user = $this->apoyosUser();
+        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10, dueno: $user);
 
-        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload([
+        $this->actingAs($user)->post('/apoyos', $this->payload([
             'detalles' => [
                 [
                     'articulo_factura_compra_id' => $articulo->id,
@@ -239,9 +243,10 @@ class ApoyoTest extends TestCase
 
     public function test_it_rejects_a_detalle_that_requests_more_than_the_available_stock(): void
     {
-        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
+        $user = $this->apoyosUser();
+        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10, dueno: $user);
 
-        $response = $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload([
+        $response = $this->actingAs($user)->post('/apoyos', $this->payload([
             'detalles' => [
                 [
                     'articulo_factura_compra_id' => $articulo->id,
@@ -261,7 +266,7 @@ class ApoyoTest extends TestCase
     public function test_updating_an_apoyo_adjusts_stock_between_the_old_and_new_quantity(): void
     {
         $user = $this->apoyosUser();
-        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
+        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10, dueno: $user);
 
         $this->actingAs($user)->post('/apoyos', $this->payload([
             'detalles' => [
@@ -298,7 +303,7 @@ class ApoyoTest extends TestCase
     public function test_deleting_an_apoyo_restores_the_stock_it_had_reserved(): void
     {
         $user = $this->apoyosUser();
-        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
+        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10, dueno: $user);
 
         $this->actingAs($user)->post('/apoyos', $this->payload([
             'detalles' => [
@@ -487,12 +492,109 @@ class ApoyoTest extends TestCase
         $this->assertNull($apoyo->invoice_id);
     }
 
+    /** Apoyo de 2 piezas del artículo dado, ya rechazado (lo que devuelve sus 2 piezas). */
+    protected function apoyoRechazado(User $capturista, ArticuloFacturaCompra $articulo, float $cantidad = 2): Apoyo
+    {
+        $this->actingAs($capturista)->post('/apoyos', $this->payload([
+            'detalles' => [[
+                'articulo_factura_compra_id' => $articulo->id,
+                'cantidad' => $cantidad,
+                'articulo' => $articulo->descripcion,
+                'costo_unidad' => 50,
+                'iva' => 0,
+            ]],
+        ]))->assertSessionHasNoErrors();
+        $apoyo = Apoyo::latest('id')->firstOrFail();
+        $this->actingAs($this->adminUser())->patch("/apoyos/{$apoyo->id}/rechazar");
+
+        return $apoyo->refresh();
+    }
+
+    public function test_un_apoyo_rechazado_se_regresa_a_preparado_y_vuelve_a_apartar_su_inventario(): void
+    {
+        $capturista = $this->apoyosUser();
+        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10, dueno: $capturista);
+        $apoyo = $this->apoyoRechazado($capturista, $articulo);
+        $this->assertEquals(10, (float) $articulo->fresh()->cantidad_disponible);
+
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/reabrir")->assertRedirect();
+
+        $this->assertSame('preparado', $apoyo->refresh()->estatus);
+        $this->assertEquals(8, (float) $articulo->fresh()->cantidad_disponible);
+
+        // Ya en preparado no se puede "reabrir" otra vez (no aparta dos veces).
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/reabrir");
+        $this->assertEquals(8, (float) $articulo->fresh()->cantidad_disponible);
+    }
+
+    public function test_si_ya_no_alcanza_el_inventario_se_queda_rechazado(): void
+    {
+        $capturista = $this->apoyosUser();
+        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10, dueno: $capturista);
+        $apoyo = $this->apoyoRechazado($capturista, $articulo, cantidad: 6);
+        // Mientras estaba rechazado, otro apoyo usó 5 de las 10 piezas.
+        $articulo->update(['cantidad_disponible' => 5]);
+
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/reabrir")->assertRedirect();
+
+        $this->assertSame('rechazado', $apoyo->refresh()->estatus);
+        $this->assertEquals(5, (float) $articulo->fresh()->cantidad_disponible);
+    }
+
+    public function test_solo_quien_ve_el_apoyo_y_puede_capturar_lo_regresa_a_preparado(): void
+    {
+        $capturista = $this->apoyosUser();
+        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10, dueno: $capturista);
+        $apoyo = $this->apoyoRechazado($capturista, $articulo);
+        $consulta = User::factory()->create();
+        $consulta->assignRole('Consulta');
+
+        $this->actingAs($this->apoyosUser())->patch("/apoyos/{$apoyo->id}/reabrir")->assertForbidden();
+        $this->actingAs($consulta)->patch("/apoyos/{$apoyo->id}/reabrir")->assertForbidden();
+
+        $this->assertSame('rechazado', $apoyo->refresh()->estatus);
+    }
+
+    public function test_editar_o_eliminar_un_rechazado_no_devuelve_el_inventario_dos_veces(): void
+    {
+        $capturista = $this->apoyosUser();
+        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10, dueno: $capturista);
+        $apoyo = $this->apoyoRechazado($capturista, $articulo);
+
+        // Completar el expediente de un rechazado (cambiando la cantidad) no toca el inventario.
+        $this->actingAs($capturista)->put("/apoyos/{$apoyo->id}", $this->payload([
+            'beneficiario_id' => $apoyo->beneficiario_id,
+            'persona_apoya_id' => $apoyo->persona_apoya_id,
+            'detalles' => [[
+                'articulo_factura_compra_id' => $articulo->id,
+                'cantidad' => 3,
+                'articulo' => $articulo->descripcion,
+                'costo_unidad' => 50,
+                'iva' => 0,
+            ]],
+        ]))->assertSessionHasNoErrors();
+
+        $this->assertSame('rechazado', $apoyo->refresh()->estatus);
+        $this->assertEquals(10, (float) $articulo->fresh()->cantidad_disponible);
+
+        // Al regresarlo a preparado aparta la cantidad nueva.
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/reabrir");
+        $this->assertEquals(7, (float) $articulo->fresh()->cantidad_disponible);
+
+        // Y eliminar uno rechazado tampoco devuelve de más.
+        $otro = $this->apoyoRechazado($capturista, $articulo);
+        $this->assertEquals(7, (float) $articulo->fresh()->cantidad_disponible);
+        $this->actingAs($capturista)->delete("/apoyos/{$otro->id}");
+        $this->assertEquals(7, (float) $articulo->fresh()->cantidad_disponible);
+    }
+
     public function test_rechazar_only_works_from_preparado_and_releases_stock(): void
     {
         $admin = $this->adminUser();
-        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10);
+        $capturista = $this->apoyosUser();
+        $articulo = $this->articuloFacturaCompra(cantidadTotal: 10, dueno: $capturista);
 
-        $this->actingAs($this->apoyosUser())->post('/apoyos', $this->payload([
+        $this->actingAs($capturista)->post('/apoyos', $this->payload([
             'detalles' => [
                 [
                     'articulo_factura_compra_id' => $articulo->id,

@@ -95,7 +95,9 @@ class DocumentosPrivadosTest extends TestCase
     public function test_el_xml_de_compra_requiere_permiso_y_se_descarga(): void
     {
         Storage::disk('local')->put('facturas-compra/a.xml', '<xml/>');
+        $dueno = $this->usuario();
         $factura = FacturaCompra::create([
+            'user_id' => $dueno->id,
             'xml_path' => 'facturas-compra/a.xml',
             'emisor' => 'Proveedor',
             'fecha' => '2026-11-01',
@@ -106,7 +108,10 @@ class DocumentosPrivadosTest extends TestCase
         $this->get($url)->assertRedirect('/login');
         $this->actingAs(User::factory()->create())->get($url)->assertForbidden();
 
-        $this->actingAs($this->usuario())->get($url)
+        // Otro usuario de Apoyos sin relación con la factura tampoco la descarga.
+        $this->actingAs($this->usuario())->get($url)->assertForbidden();
+
+        $this->actingAs($dueno)->get($url)
             ->assertOk()
             ->assertHeaderContains('Content-Disposition', 'attachment');
     }

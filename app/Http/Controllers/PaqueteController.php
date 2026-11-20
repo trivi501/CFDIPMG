@@ -15,9 +15,12 @@ use Inertia\Response;
 
 class PaqueteController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $paquetes = Paquete::with('articulos.articuloFacturaCompra', 'facturaCompra')->orderBy('nombre')->get();
+        $paquetes = Paquete::whereIn('factura_compra_id', FacturaCompra::visiblePara($request->user())->select('id'))
+            ->with('articulos.articuloFacturaCompra', 'facturaCompra')
+            ->orderBy('nombre')
+            ->get();
 
         return Inertia::render('paquetes/index', [
             'paquetes' => $paquetes->map(fn (Paquete $paquete) => [
@@ -27,10 +30,10 @@ class PaqueteController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         return Inertia::render('paquetes/create', [
-            'facturas' => $this->facturas(),
+            'facturas' => $this->facturas($request),
         ]);
     }
 
@@ -52,16 +55,20 @@ class PaqueteController extends Controller
         return to_route('paquetes.index');
     }
 
-    public function edit(Paquete $paquete): Response
+    public function edit(Request $request, Paquete $paquete): Response
     {
+        $this->authorizeAccess($request, $paquete);
+
         return Inertia::render('paquetes/edit', [
             'paquete' => $paquete->load('articulos'),
-            'facturas' => $this->facturas(),
+            'facturas' => $this->facturas($request),
         ]);
     }
 
     public function update(Request $request, Paquete $paquete): RedirectResponse
     {
+        $this->authorizeAccess($request, $paquete);
+
         $data = $this->validated($request, $paquete);
 
         DB::transaction(function () use ($data, $paquete) {
@@ -79,8 +86,10 @@ class PaqueteController extends Controller
         return to_route('paquetes.index');
     }
 
-    public function destroy(Paquete $paquete): RedirectResponse
+    public function destroy(Request $request, Paquete $paquete): RedirectResponse
     {
+        $this->authorizeAccess($request, $paquete);
+
         $paquete->delete();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Paquete eliminado.']);
@@ -91,11 +100,18 @@ class PaqueteController extends Controller
     /**
      * @return Collection<int, FacturaCompra>
      */
-    protected function facturas(): Collection
+    protected function facturas(Request $request): Collection
     {
-        return FacturaCompra::with(['articulos' => fn ($query) => $query->orderBy('descripcion')])
+        return FacturaCompra::visiblePara($request->user())
+            ->with(['articulos' => fn ($query) => $query->orderBy('descripcion')])
             ->latest('fecha')
             ->get();
+    }
+
+    /** Un paquete es de quien puede ver su factura de compra. */
+    protected function authorizeAccess(Request $request, Paquete $paquete): void
+    {
+        abort_unless($paquete->facturaCompra?->esVisiblePara($request->user()) ?? false, 403);
     }
 
     /**
@@ -121,7 +137,12 @@ class PaqueteController extends Controller
     protected function validated(Request $request, ?Paquete $paquete = null): array
     {
         return $request->validate([
-            'factura_compra_id' => ['required', 'integer', 'exists:facturas_compra,id'],
+            'factura_compra_id' => [
+                'required',
+                'integer',
+                // Solo de una factura que el usuario puede ver (la suya o la de su área).
+                Rule::in(FacturaCompra::visiblePara($request->user())->pluck('id')->all()),
+            ],
             'nombre' => ['required', 'string', 'max:255', Rule::unique('paquetes', 'nombre')->ignore($paquete)],
             'articulos' => ['required', 'array', 'min:1'],
             'articulos.*.articulo_factura_compra_id' => [
@@ -133,6 +154,7 @@ class PaqueteController extends Controller
             'articulos.*.cantidad' => ['required', 'numeric', 'min:0.01'],
         ], [
             'factura_compra_id.required' => 'Selecciona la factura del paquete.',
+            'factura_compra_id.in' => 'Selecciona una de tus facturas de compra.',
             'nombre.unique' => 'Ya existe un paquete con ese nombre.',
             'articulos.required' => 'Agrega al menos un artículo al paquete.',
             'articulos.*.articulo_factura_compra_id.distinct' => 'Un artículo no se puede repetir en el paquete.',

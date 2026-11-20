@@ -94,6 +94,18 @@ escritura (`*.manage` / `*.create`). En el frontend, `HandleInertiaRequests` com
 expone `can()`/`hasRole()` para ocultar UI condicionalmente — eso es solo UX, la autorización real
 vive en el middleware.
 
+### Visibilidad por área (regidurías y secretarías)
+
+Los apoyos y las **facturas de compra** son de quien los captura y de su área (`users.area_id`):
+cada regidor ve solo lo suyo y lo de su área; `apoyos.view-all` (Admin, Facturación) ve todo. Para
+facturas de compra usa siempre el scope `FacturaCompra::visiblePara($user)` (lista, XML, inventario
+que se ofrece al capturar apoyos, paquetes); `reserveStock()` rechaza artículos de facturas que el
+usuario no ve. Las facturas sin `user_id` ni `area_id` (subidas antes de que tuvieran dueño) solo las
+ve `apoyos.view-all` hasta que se les asigna área en la pantalla de Facturas de compra.
+
+Un apoyo **rechazado** ya devolvió su inventario: editarlo o eliminarlo no lo devuelve otra vez, y
+`reabrir` (regresar a preparado) lo vuelve a apartar.
+
 ### Bitácora de auditoría
 
 `App\Support\RegistroAuditoria` (registrado en `AppServiceProvider`) escribe en la tabla `auditoria`

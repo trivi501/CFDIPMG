@@ -11,6 +11,7 @@ use App\Models\DetalleApoyo;
 use App\Models\FacturaCompra;
 use App\Models\Paquete;
 use App\Models\PersonaApoya;
+use App\Models\User;
 use App\Services\Facturapi\FacturapiClient;
 use App\Services\InvoiceService;
 use App\Support\ImpuestosFactura;
@@ -94,13 +95,13 @@ class ApoyoController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         return Inertia::render('apoyos/create', [
             'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre']),
             'personasApoya' => PersonaApoya::orderBy('nombre')->get(['id', 'nombre']),
-            'facturasDisponibles' => $this->facturasDisponibles(),
-            'paquetes' => Paquete::with('articulos')->orderBy('nombre')->get(),
+            'facturasDisponibles' => $this->facturasDisponibles($request),
+            'paquetes' => $this->paquetesDisponibles($request),
         ]);
     }
 
@@ -109,7 +110,7 @@ class ApoyoController extends Controller
         $data = $this->validated($request);
 
         DB::transaction(function () use ($data, $request) {
-            $this->reserveStock($data['detalles']);
+            $this->reserveStock($data['detalles'], $request->user());
 
             $apoyo = Apoyo::create([
                 'fecha' => $data['fecha'],
@@ -206,8 +207,8 @@ class ApoyoController extends Controller
             'apoyo' => $apoyo,
             'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre']),
             'personasApoya' => PersonaApoya::orderBy('nombre')->get(['id', 'nombre']),
-            'facturasDisponibles' => $this->facturasDisponibles(),
-            'paquetes' => Paquete::with('articulos')->orderBy('nombre')->get(),
+            'facturasDisponibles' => $this->facturasDisponibles($request),
+            'paquetes' => $this->paquetesDisponibles($request),
         ]);
     }
 
@@ -217,11 +218,20 @@ class ApoyoController extends Controller
 
         $data = $this->validated($request);
 
-        DB::transaction(function () use ($data, $request, $apoyo) {
-            $this->releaseStock($apoyo->detalles);
+        // Un apoyo rechazado ya devolvió su inventario al rechazarse: si se edita (p. ej. para
+        // completar el expediente) no se devuelve otra vez ni se aparta; se aparta al regresarlo a
+        // preparado. Antes se devolvía dos veces y la factura de compra quedaba con piezas de más.
+        $apartaInventario = $apoyo->estatus !== Apoyo::ESTATUS_RECHAZADO;
+
+        DB::transaction(function () use ($data, $request, $apoyo, $apartaInventario) {
+            if ($apartaInventario) {
+                $this->releaseStock($apoyo->detalles);
+            }
             $apoyo->detalles()->delete();
 
-            $this->reserveStock($data['detalles']);
+            if ($apartaInventario) {
+                $this->reserveStock($data['detalles'], $request->user());
+            }
 
             $apoyo->update([
                 'fecha' => $data['fecha'],
@@ -251,7 +261,10 @@ class ApoyoController extends Controller
         $this->authorizeAccess($request, $apoyo);
 
         DB::transaction(function () use ($apoyo) {
-            $this->releaseStock($apoyo->detalles);
+            // Uno rechazado ya devolvió su inventario al rechazarse.
+            if ($apoyo->estatus !== Apoyo::ESTATUS_RECHAZADO) {
+                $this->releaseStock($apoyo->detalles);
+            }
             $apoyo->delete();
         });
 
@@ -304,6 +317,47 @@ class ApoyoController extends Controller
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Apoyo rechazado.']);
+
+        return back();
+    }
+
+    /**
+     * Regresa un apoyo rechazado a preparado, p. ej. una vez completado su expediente, para que se
+     * vuelva a revisar y aprobar. Vuelve a apartar su inventario; si ya no alcanza, se queda
+     * rechazado y se avisa para ajustar las cantidades.
+     */
+    public function reabrir(Request $request, Apoyo $apoyo): RedirectResponse
+    {
+        $this->authorizeAccess($request, $apoyo);
+
+        if ($apoyo->estatus !== Apoyo::ESTATUS_RECHAZADO) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Solo un apoyo rechazado se puede regresar a preparado.']);
+
+            return back();
+        }
+
+        try {
+            DB::transaction(function () use ($request, $apoyo) {
+                $lineas = [];
+                foreach ($apoyo->detalles as $detalle) {
+                    $lineas[] = [
+                        'articulo_factura_compra_id' => $detalle->articulo_factura_compra_id,
+                        'cantidad' => $detalle->cantidad,
+                    ];
+                }
+
+                $this->reserveStock($lineas, $request->user());
+
+                $apoyo->update(['estatus' => Apoyo::ESTATUS_PREPARADO]);
+            });
+        } catch (ValidationException $e) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => collect($e->errors())->flatten()->first()
+                .' Edita el apoyo para ajustar las cantidades y vuelve a intentarlo.']);
+
+            return back();
+        }
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Apoyo regresado a preparado.']);
 
         return back();
     }
@@ -606,21 +660,38 @@ class ApoyoController extends Controller
     /**
      * @return Collection<int, FacturaCompra>
      */
-    protected function facturasDisponibles(): Collection
+    protected function facturasDisponibles(Request $request): Collection
     {
-        return FacturaCompra::with(['articulos' => fn ($query) => $query->orderBy('descripcion')])
+        return FacturaCompra::visiblePara($request->user())
+            ->with(['articulos' => fn ($query) => $query->orderBy('descripcion')])
             ->latest('fecha')
+            ->get();
+    }
+
+    /**
+     * Paquetes armados con facturas que el usuario puede ver.
+     *
+     * @return Collection<int, Paquete>
+     */
+    protected function paquetesDisponibles(Request $request): Collection
+    {
+        return Paquete::whereIn('factura_compra_id', FacturaCompra::visiblePara($request->user())->select('id'))
+            ->with('articulos')
+            ->orderBy('nombre')
             ->get();
     }
 
     /**
      * Locks and decrements the available stock for each detalle line that references
      * an articulo_factura_compra, throwing a validation error if there isn't enough left.
+     * Only stock from purchase invoices the user can see may be used.
      *
      * @param  list<array<string, mixed>>  $detalles
      */
-    protected function reserveStock(array $detalles): void
+    protected function reserveStock(array $detalles, User $user): void
     {
+        $facturasVisibles = null;
+
         foreach ($detalles as $detalle) {
             $articuloId = $detalle['articulo_factura_compra_id'] ?? null;
 
@@ -629,6 +700,14 @@ class ApoyoController extends Controller
             }
 
             $articulo = ArticuloFacturaCompra::whereKey($articuloId)->lockForUpdate()->firstOrFail();
+
+            $facturasVisibles ??= FacturaCompra::visiblePara($user)->pluck('id')->all();
+            if (! in_array($articulo->factura_compra_id, $facturasVisibles, true)) {
+                throw ValidationException::withMessages([
+                    'detalles' => "\"{$articulo->descripcion}\" es de una factura de compra de otra área.",
+                ]);
+            }
+
             $cantidad = (float) $detalle['cantidad'];
 
             if ($cantidad > (float) $articulo->cantidad_disponible) {

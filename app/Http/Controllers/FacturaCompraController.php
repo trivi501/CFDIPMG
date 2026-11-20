@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Area;
 use App\Models\FacturaCompra;
 use App\Services\Cfdi\CfdiXmlParser;
 use Illuminate\Database\QueryException;
@@ -18,16 +19,25 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FacturaCompraController extends Controller
 {
-    public function index(): Response
+    /** Cada regidor ve las facturas de su área; Admin y Facturación (apoyos.view-all), todas. */
+    public function index(Request $request): Response
     {
+        $puedeAsignar = $request->user()->can('apoyos.view-all');
+
         return Inertia::render('facturas-compra/index', [
-            'facturas' => FacturaCompra::with('articulos')->latest('fecha')->get(),
+            'facturas' => FacturaCompra::visiblePara($request->user())
+                ->with('articulos', 'area:id,nombre')
+                ->latest('fecha')
+                ->get(),
+            'areas' => $puedeAsignar ? Area::orderBy('nombre')->get(['id', 'nombre']) : [],
+            'puedeAsignarArea' => $puedeAsignar,
         ]);
     }
 
     // Se descarga, no se abre: un XML subido podría ejecutar código en el navegador.
-    public function xml(FacturaCompra $factura): StreamedResponse
+    public function xml(Request $request, FacturaCompra $factura): StreamedResponse
     {
+        abort_unless($factura->esVisiblePara($request->user()), 403);
         abort_unless(Storage::disk('local')->exists($factura->xml_path), 404);
 
         return Storage::disk('local')->download(
@@ -74,8 +84,11 @@ class FacturaCompraController extends Controller
         $path = $request->file('xml')->store('facturas-compra', 'local');
 
         try {
-            $factura = DB::transaction(function () use ($parsed, $path, $hash) {
+            $factura = DB::transaction(function () use ($request, $parsed, $path, $hash) {
                 $factura = FacturaCompra::create([
+                    // De quien la sube y de su área: solo la ven (y usan su inventario) ellos.
+                    'user_id' => $request->user()->id,
+                    'area_id' => $request->user()->area_id,
                     'xml_path' => $path,
                     'uuid' => $parsed['uuid'],
                     'xml_hash' => $hash,
@@ -113,6 +126,25 @@ class FacturaCompraController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Factura de compra registrada.']);
 
         return to_route('facturas-compra.index');
+    }
+
+    /**
+     * Asigna (o cambia) el área dueña de una factura: sobre todo para las subidas antes de que las
+     * facturas tuvieran dueño, que mientras tanto solo ven Admin y Facturación.
+     */
+    public function asignarArea(Request $request, FacturaCompra $factura): RedirectResponse
+    {
+        $data = $request->validate([
+            'area_id' => ['nullable', 'integer', 'exists:areas,id'],
+        ]);
+
+        $factura->update(['area_id' => $data['area_id'] ?? null]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $factura->area_id === null
+            ? 'La factura quedó sin área: solo la ven Admin y Facturación.'
+            : 'Área asignada a la factura.']);
+
+        return back();
     }
 
     protected function uploadError(Request $request, string $message): RedirectResponse|JsonResponse

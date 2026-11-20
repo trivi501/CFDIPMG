@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Apoyo;
+use App\Models\Area;
 use App\Models\ArticuloFacturaCompra;
 use App\Models\Beneficiario;
 use App\Models\FacturaCompra;
@@ -17,25 +18,30 @@ class PaqueteTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Área común: las facturas de compra y los paquetes son del área de quien los usa. */
+    private Area $area;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->withoutVite();
         $this->seed(RolesAndPermissionsSeeder::class);
+        $this->area = Area::create(['nombre' => 'Regidor de prueba', 'tipo' => Area::TIPO_REGIDURIA]);
     }
 
-    private function usuario(string $rol = 'Apoyos'): User
+    private function usuario(string $rol = 'Apoyos', ?Area $area = null): User
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['area_id' => ($area ?? $this->area)->id]);
         $user->assignRole($rol);
 
         return $user;
     }
 
-    private function factura(): FacturaCompra
+    private function factura(?Area $area = null): FacturaCompra
     {
         return FacturaCompra::create([
+            'area_id' => ($area ?? $this->area)->id,
             'xml_path' => 'facturas-compra/fake.xml',
             'emisor' => 'Proveedor',
             'fecha' => '2026-11-01',
