@@ -11,6 +11,7 @@ class Invoice extends Model
     protected $fillable = [
         'payment_receipt_id',
         'customer_id',
+        'receptor_nombre',
         'facturapi_invoice_id',
         'uuid',
         'series',

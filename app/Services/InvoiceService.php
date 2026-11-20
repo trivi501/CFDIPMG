@@ -12,14 +12,19 @@ use Illuminate\Support\Facades\DB;
 
 class InvoiceService
 {
+    public const NOMBRE_PUBLICO_GENERAL = 'PUBLICO EN GENERAL';
+
     public function __construct(protected FacturapiClient $facturapi) {}
 
     /**
      * Convert a payment receipt into a CFDI invoice via Facturapi. Pass a null
      * $receipt for an "open" invoice with no underlying registered payment.
      *
+     * $cfdi['receptor_nombre'] solo aplica cuando el cliente es el RFC genérico (público en general):
+     * es el nombre con el que se emite esa factura en particular, p. ej. el beneficiario de un apoyo.
+     *
      * @param  list<array{description: string, sat_product_key: string, sat_unit_key: string, quantity: float, unit_price: float}>  $items
-     * @param  array{payment_form: string, payment_method: string, use: string, type?: 'I'|'E', iva?: bool, isr_rate?: float|null}  $cfdi
+     * @param  array{payment_form: string, payment_method: string, use: string, type?: 'I'|'E', iva?: bool, isr_rate?: float|null, receptor_nombre?: string|null}  $cfdi
      */
     public function generate(?PaymentReceipt $receipt, Customer $customer, array $items, array $cfdi): Invoice
     {
@@ -33,12 +38,11 @@ class InvoiceService
 
         $impuestos = $this->impuestos($conIva, $cfdi['isr_rate'] ?? null);
 
-        try {
-            $facturapiCustomerId = $customer->facturapi_customer_id
-                ?? $this->syncCustomerToFacturapi($customer);
+        $nombreReceptor = $this->nombreReceptor($customer, $cfdi['receptor_nombre'] ?? null);
 
+        try {
             $response = $this->facturapi->createInvoice([
-                'customer' => $facturapiCustomerId,
+                'customer' => $this->receptorFacturapi($customer, $nombreReceptor),
                 'items' => collect($items)->map(fn (array $item) => [
                     'quantity' => $item['quantity'],
                     'product' => [
@@ -57,10 +61,11 @@ class InvoiceService
                 'currency' => $receipt === null ? 'MXN' : $receipt->currency,
             ])->json();
 
-            return DB::transaction(function () use ($receipt, $customer, $response, $total) {
+            return DB::transaction(function () use ($receipt, $customer, $nombreReceptor, $response, $total) {
                 $invoice = Invoice::create([
                     'payment_receipt_id' => $receipt?->id,
                     'customer_id' => $customer->id,
+                    'receptor_nombre' => $nombreReceptor,
                     'facturapi_invoice_id' => $response['id'] ?? null,
                     'uuid' => $response['uuid'] ?? null,
                     'series' => $response['series'] ?? null,
@@ -78,6 +83,7 @@ class InvoiceService
             $invoice = Invoice::create([
                 'payment_receipt_id' => $receipt?->id,
                 'customer_id' => $customer->id,
+                'receptor_nombre' => $nombreReceptor,
                 'status' => 'failed',
                 'total' => $total,
                 'error_message' => $exception->response->json('message') ?? $exception->getMessage(),
@@ -122,12 +128,13 @@ class InvoiceService
             ]
         );
 
-        try {
-            $facturapiCustomerId = $customer->facturapi_customer_id
-                ?? $this->syncCustomerToFacturapi($customer);
+        // El SAT exige "PUBLICO EN GENERAL" en la factura global, sin importar cómo se llame el
+        // Customer compartido del RFC genérico.
+        $nombreReceptor = self::NOMBRE_PUBLICO_GENERAL;
 
+        try {
             $response = $this->facturapi->createInvoice([
-                'customer' => $facturapiCustomerId,
+                'customer' => $this->receptorFacturapi($customer, $nombreReceptor),
                 'items' => [[
                     'quantity' => 1,
                     'product' => [
@@ -152,9 +159,10 @@ class InvoiceService
                 ],
             ])->json();
 
-            return DB::transaction(function () use ($receipts, $customer, $response, $total, $month, $year) {
+            return DB::transaction(function () use ($receipts, $customer, $nombreReceptor, $response, $total, $month, $year) {
                 $invoice = Invoice::create([
                     'customer_id' => $customer->id,
+                    'receptor_nombre' => $nombreReceptor,
                     'facturapi_invoice_id' => $response['id'] ?? null,
                     'uuid' => $response['uuid'] ?? null,
                     'series' => $response['series'] ?? null,
@@ -175,6 +183,7 @@ class InvoiceService
         } catch (RequestException $exception) {
             return Invoice::create([
                 'customer_id' => $customer->id,
+                'receptor_nombre' => $nombreReceptor,
                 'status' => 'failed',
                 'total' => $total,
                 'error_message' => $exception->response->json('message') ?? $exception->getMessage(),
@@ -204,6 +213,43 @@ class InvoiceService
         }
 
         return $taxes === [] ? ['taxability' => '01'] : ['taxability' => '02', 'taxes' => $taxes];
+    }
+
+    /**
+     * Nombre con el que se emite la factura. Un RFC real es de una sola persona y se factura con su
+     * nombre registrado. El RFC genérico lo comparten todos: cada factura lleva el nombre que se le
+     * indique (p. ej. el beneficiario de un apoyo) o "PUBLICO EN GENERAL".
+     */
+    protected function nombreReceptor(Customer $customer, ?string $nombre): string
+    {
+        if ($customer->rfc !== Customer::RFC_PUBLICO_GENERAL) {
+            return $customer->legal_name;
+        }
+
+        $nombre = trim((string) $nombre);
+
+        return $nombre !== '' ? $nombre : self::NOMBRE_PUBLICO_GENERAL;
+    }
+
+    /**
+     * Receptor para Facturapi. Con un RFC real se usa el cliente guardado en Facturapi. Con el RFC
+     * genérico NO: ese cliente es uno solo para todos y su nombre es el del primero que se facturó,
+     * así que los datos del receptor van en la factura misma con el nombre que le corresponde.
+     *
+     * @return string|array<string, mixed>
+     */
+    protected function receptorFacturapi(Customer $customer, string $nombre): string|array
+    {
+        if ($customer->rfc !== Customer::RFC_PUBLICO_GENERAL) {
+            return $customer->facturapi_customer_id ?? $this->syncCustomerToFacturapi($customer);
+        }
+
+        return [
+            'legal_name' => $nombre,
+            'tax_id' => Customer::RFC_PUBLICO_GENERAL,
+            'tax_system' => '616',
+            'address' => ['zip' => $customer->zip],
+        ];
     }
 
     protected function syncCustomerToFacturapi(Customer $customer): string

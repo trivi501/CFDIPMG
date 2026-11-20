@@ -33,6 +33,7 @@ class InvoiceController extends Controller
                     $query->where('uuid', 'like', "%{$search}%")
                         ->orWhere('folio', 'like', "%{$search}%")
                         ->orWhere('series', 'like', "%{$search}%")
+                        ->orWhere('receptor_nombre', 'like', "%{$search}%")
                         ->orWhereHas('customer', fn ($query) => $query
                             ->where('legal_name', 'like', "%{$search}%")
                             ->orWhere('rfc', 'like', "%{$search}%"));

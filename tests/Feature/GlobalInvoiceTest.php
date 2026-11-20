@@ -108,18 +108,43 @@ class GlobalInvoiceTest extends TestCase
         $this->assertSame('invoiced', $b->fresh()->status);
         $this->assertSame($invoice->id, $b->fresh()->invoice_id);
 
-        $this->assertDatabaseHas('customers', [
-            'rfc' => Customer::RFC_PUBLICO_GENERAL,
-            'facturapi_customer_id' => 'fact_cus_public',
-        ]);
+        $this->assertDatabaseHas('customers', ['rfc' => Customer::RFC_PUBLICO_GENERAL]);
+        $this->assertSame('PUBLICO EN GENERAL', $invoice->receptor_nombre);
 
+        // El receptor va en la factura misma; el cliente compartido no se registra en Facturapi.
+        Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/v2/customers'));
         Http::assertSent(fn ($request) => $request->url() === 'https://www.facturapi.io/v2/invoices'
+            && $request['customer']['legal_name'] === 'PUBLICO EN GENERAL'
+            && $request['customer']['tax_id'] === Customer::RFC_PUBLICO_GENERAL
             && $request['use'] === 'S01'
             && $request['global']['periodicity'] === 'month'
             && $request['global']['months'] === '08'
             && $request['global']['year'] === 2026
             && $request['items'][0]['product']['price'] === 150.0
             && $request['items'][0]['product']['tax_included'] === true);
+    }
+
+    public function test_la_factura_global_va_a_publico_en_general_aunque_el_cliente_compartido_tenga_otro_nombre(): void
+    {
+        // Así quedó en producción: el primer apoyo a público en general bautizó al cliente compartido.
+        Customer::create([
+            'rfc' => Customer::RFC_PUBLICO_GENERAL,
+            'legal_name' => 'BLANCA ESTHELA JARAMILLO MARTINEZ',
+            'tax_system' => '616',
+            'zip' => '01000',
+            'facturapi_customer_id' => 'fact_cus_blanca',
+        ]);
+        Http::fake(['www.facturapi.io/v2/invoices' => Http::response(['id' => 'fact_inv_g', 'uuid' => 'uuid-g', 'total' => 100], 201)]);
+        $this->receipt(['external_id' => 'A', 'payment_date' => '2026-08-01', 'amount' => 100]);
+
+        $this->actingAs($this->billingUser())->post('/invoices/global', [
+            'month' => 8, 'year' => 2026, 'payment_form' => '01', 'payment_method' => 'PUE',
+        ]);
+
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/v2/invoices')
+            && $request['customer']['legal_name'] === 'PUBLICO EN GENERAL');
+        Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/v2/invoices')
+            && $request['customer'] === 'fact_cus_blanca');
     }
 
     public function test_it_refuses_to_generate_an_empty_global_invoice(): void

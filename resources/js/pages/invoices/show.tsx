@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePermissions } from '@/hooks/use-permissions';
 import { fechaMxDeMomento } from '@/lib/fechas';
+import { nombreReceptor } from '@/lib/receptor';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
 
@@ -24,6 +25,7 @@ type Invoice = {
     is_global: boolean;
     period_month: number | null;
     period_year: number | null;
+    receptor_nombre: string | null;
     customer: { legal_name: string; rfc: string; email: string | null } | null;
     payment_receipt: {
         external_id: string;
@@ -68,7 +70,7 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                 <div className="flex items-center justify-between">
                     <Heading
                         title={`Factura ${invoice.series ?? ''}${invoice.folio ?? ''}`}
-                        description={invoice.customer?.legal_name}
+                        description={nombreReceptor(invoice)}
                     />
                     <div className="flex gap-2">
                         {invoice.is_global && (
@@ -85,7 +87,7 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                         </CardHeader>
                         <CardContent className="space-y-1 text-sm">
                             <p className="font-medium">
-                                {invoice.customer?.legal_name}
+                                {nombreReceptor(invoice)}
                             </p>
                             <p className="text-muted-foreground">
                                 RFC: {invoice.customer?.rfc}

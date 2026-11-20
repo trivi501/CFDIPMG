@@ -475,8 +475,9 @@ class ApoyoTest extends TestCase
         $apoyo = Apoyo::firstOrFail();
         $apoyo->update(['estatus' => 'aprobado']);
 
+        // A público en general el receptor va en la factura, así que el rechazo llega al timbrar.
         Http::fake([
-            'www.facturapi.io/v2/customers' => Http::response(['message' => 'RFC inválido'], 400),
+            'www.facturapi.io/v2/invoices' => Http::response(['message' => 'Datos del receptor inválidos'], 400),
         ]);
 
         $this->actingAs($admin)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload())
@@ -830,6 +831,55 @@ class ApoyoTest extends TestCase
     }
 
     /** @return list<array<string, mixed>> */
+    public function test_cada_apoyo_a_publico_en_general_se_factura_con_el_nombre_de_su_beneficiario(): void
+    {
+        $capturista = $this->apoyosUser();
+        $admin = $this->adminUser();
+        $nombres = ['BLANCA ESTHELA JARAMILLO MARTINEZ', 'JOSE LUIS PEREZ GARCIA', 'MARIA LOPEZ RUIZ'];
+
+        foreach ($nombres as $nombre) {
+            $this->actingAs($capturista)->post('/apoyos', $this->payload([
+                'beneficiario_id' => Beneficiario::create(['nombre' => $nombre])->id,
+            ]));
+        }
+        $this->actingAs($admin)->post('/apoyos/aprobar-todo');
+        [$primero, $segundo, $tercero] = Apoyo::orderBy('id')->with('beneficiario')->get()->all();
+        $this->fakeFacturapi();
+
+        // Uno por uno, con el nombre que trae el formulario (el del beneficiario).
+        foreach ([$primero, $segundo] as $apoyo) {
+            $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload([
+                'legal_name' => $apoyo->beneficiario->nombre,
+            ]))->assertSessionHasNoErrors();
+        }
+        // Y el tercero con "Facturar todo", que toma el nombre del beneficiario.
+        $this->actingAs($capturista)->post('/apoyos/facturar-todo', ['payment_form' => '01']);
+
+        $this->assertSame($nombres, collect($this->facturasEnviadas())->pluck('customer.legal_name')->all());
+        $this->assertSame([Customer::RFC_PUBLICO_GENERAL], collect($this->facturasEnviadas())->pluck('customer.tax_id')->unique()->values()->all());
+        $this->assertSame($nombres, Invoice::orderBy('id')->pluck('receptor_nombre')->all());
+
+        // El cliente del RFC genérico sigue siendo uno solo y no se registra en Facturapi.
+        $this->assertSame(1, Customer::where('rfc', Customer::RFC_PUBLICO_GENERAL)->count());
+        Http::assertNotSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/v2/customers'));
+    }
+
+    public function test_con_rfc_real_se_sigue_usando_el_cliente_registrado(): void
+    {
+        $capturista = $this->apoyosUser();
+        $this->actingAs($capturista)->post('/apoyos', $this->payload());
+        $apoyo = Apoyo::firstOrFail();
+        $this->actingAs($this->adminUser())->patch("/apoyos/{$apoyo->id}/aprobar");
+        $this->fakeFacturapi();
+
+        $this->actingAs($capturista)->patch("/apoyos/{$apoyo->id}/facturar", $this->facturarPayload([
+            'rfc' => 'PEJU800101AB1', 'legal_name' => 'JUAN PEREZ', 'tax_system' => '612', 'zip' => '98600', 'use' => 'G03',
+        ]))->assertSessionHasNoErrors();
+
+        $this->assertSame(['fact_cus_apoyo'], collect($this->facturasEnviadas())->pluck('customer')->all());
+        $this->assertSame('JUAN PEREZ', Invoice::sole()->receptor_nombre);
+    }
+
     protected function facturasEnviadas(): array
     {
         return Http::recorded(fn (HttpRequest $request) => str_ends_with($request->url(), '/v2/invoices'))

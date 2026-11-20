@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { EstatusBadge } from '@/components/estatus-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { nombreReceptor } from '@/lib/receptor';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
 
@@ -11,6 +12,7 @@ type Invoice = {
     status: string;
     total: string;
     issued_at: string | null;
+    receptor_nombre: string | null;
     customer: { legal_name: string } | null;
 };
 
@@ -100,7 +102,7 @@ export default function Dashboard({ stats, recentInvoices }: PageProps) {
                                                 href={invoices.show(invoice)}
                                                 className="font-medium hover:underline"
                                             >
-                                                {invoice.customer?.legal_name ??
+                                                {nombreReceptor(invoice) ??
                                                     'Cliente'}
                                             </Link>
                                             <p className="text-muted-foreground">

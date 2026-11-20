@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
 import { fechaMxDeMomento } from '@/lib/fechas';
+import { nombreReceptor } from '@/lib/receptor';
 import { dashboard } from '@/routes';
 import invoices from '@/routes/invoices';
 import globalInvoice from '@/routes/invoices/global';
@@ -33,6 +34,7 @@ type Invoice = {
     total: string;
     issued_at: string | null;
     is_global: boolean;
+    receptor_nombre: string | null;
     customer: { legal_name: string; rfc: string } | null;
 };
 
@@ -47,7 +49,7 @@ const tieneXml = (invoice: Invoice) =>
     invoice.uuid !== null && invoice.status !== 'failed';
 
 const nombreFactura = (invoice: Invoice) =>
-    `${invoice.series ?? ''}${invoice.folio ?? ''} ${invoice.customer?.legal_name ?? ''}`.trim();
+    `${invoice.series ?? ''}${invoice.folio ?? ''} ${nombreReceptor(invoice) ?? ''}`.trim();
 
 const currency = new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -340,8 +342,7 @@ export default function InvoicesIndex({
                                             href={invoices.show(invoice)}
                                             className="hover:underline"
                                         >
-                                            {invoice.customer?.legal_name ??
-                                                '—'}
+                                            {nombreReceptor(invoice) ?? '—'}
                                         </Link>
                                         {invoice.customer?.rfc && (
                                             <span className="block font-mono text-xs font-normal text-muted-foreground">

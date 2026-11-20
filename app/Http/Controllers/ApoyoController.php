@@ -337,6 +337,8 @@ class ApoyoController extends Controller
             ...self::CFDI_APOYO,
             'payment_form' => $data['payment_form'],
             'use' => $data['use'],
+            // Con el RFC genérico el Customer es compartido: el nombre capturado va en esta factura.
+            'receptor_nombre' => $data['legal_name'],
             ...ImpuestosFactura::desde($request, ivaPorDefecto: false),
         ]);
 
@@ -379,7 +381,7 @@ class ApoyoController extends Controller
                     'zip' => '01000',
                 ])
                 : Customer::firstOrCreate(['rfc' => Customer::RFC_PUBLICO_GENERAL], [
-                    'legal_name' => 'PUBLICO EN GENERAL',
+                    'legal_name' => InvoiceService::NOMBRE_PUBLICO_GENERAL,
                     'tax_system' => '616',
                     'zip' => '01000',
                 ]);
@@ -388,6 +390,8 @@ class ApoyoController extends Controller
                 ...self::CFDI_APOYO,
                 'payment_form' => $data['payment_form'],
                 'use' => self::usoParaRegimen($customer->tax_system),
+                // A público en general, cada factura lleva el nombre de su beneficiario.
+                'receptor_nombre' => $apoyo->beneficiario?->nombre,
                 ...$impuestos,
             ]);
 

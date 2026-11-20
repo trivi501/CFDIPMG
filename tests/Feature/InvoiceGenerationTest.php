@@ -74,7 +74,7 @@ class InvoiceGenerationTest extends TestCase
 
         $customer = Customer::create([
             'legal_name' => 'Cliente de Prueba',
-            'rfc' => 'XAXX010101000',
+            'rfc' => 'CUPU800825569',
             'tax_system' => '616',
             'zip' => '01000',
         ]);
@@ -138,7 +138,7 @@ class InvoiceGenerationTest extends TestCase
 
         $customer = Customer::create([
             'legal_name' => 'Cliente de Prueba',
-            'rfc' => 'XAXX010101000',
+            'rfc' => 'CUPU800825569',
             'tax_system' => '616',
             'zip' => '01000',
         ]);
