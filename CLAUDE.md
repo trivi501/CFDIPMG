@@ -34,6 +34,7 @@ npm run build                  # build de producción (Vite)
 php artisan migrate            # correr migraciones (MySQL local vía Laragon, ver .env)
 php artisan db:seed            # roles/permisos + usuario admin (ver DatabaseSeeder)
 php artisan permisos:sincronizar [--pretend]   # agrega permisos/roles nuevos del catálogo sin quitar nada
+php artisan areas:revisar     # solo lectura: qué áreas son privadas y quién ve las facturas de todos
 php artisan app:create-api-client "Nombre"   # genera una API key para que un sistema externo empuje recibos
 php artisan wayfinder:generate --with-form   # regenerar las acciones TS tras cambiar rutas/controllers
 ```
@@ -106,6 +107,10 @@ facturas de compra usa siempre el scope `FacturaCompra::visiblePara($user)` (lis
 que se ofrece al capturar apoyos, paquetes); `reserveStock()` rechaza artículos de facturas que el
 usuario no ve. Las facturas sin `user_id` ni `area_id` (subidas antes de que tuvieran dueño) solo las
 ve `apoyos.view-all` hasta que se les asigna área en la pantalla de Facturas de compra.
+
+Para apoyos, el equivalente es el scope `Apoyo::visiblePara($user)`; lo usan la pantalla de Apoyos y
+las gráficas del dashboard (`DashboardController`: facturas vigentes de apoyos por área, por usuario en
+las áreas privadas y por mes), así que cada quien solo ve en las gráficas lo que ve en Apoyos.
 
 Un apoyo **rechazado** ya devolvió su inventario: editarlo o eliminarlo no lo devuelve otra vez, y
 `reabrir` (regresar a preparado) lo vuelve a apartar.

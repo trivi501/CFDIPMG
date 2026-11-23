@@ -115,6 +115,10 @@ class FacturasCompraPorAreaTest extends TestCase
         // Facturas de compra y su XML.
         $this->assertSame(['Del regidor'], $this->emisoresQueVe($regidor));
         $this->assertSame(['Del otro'], $this->emisoresQueVe($asistenteDeOtro));
+        // El buscador "Factura" al capturar un apoyo y al armar un paquete.
+        $this->assertSame(['Del regidor'], $this->emisoresQueVe($regidor, '/apoyos/create', 'facturasDisponibles'));
+        $this->assertSame(['Del otro'], $this->emisoresQueVe($asistenteDeOtro, '/apoyos/create', 'facturasDisponibles'));
+        $this->assertSame(['Del regidor'], $this->emisoresQueVe($regidor, '/paquetes/create'));
         $this->actingAs($regidor)->get("/facturas-compra/{$ajena->id}/xml")->assertForbidden();
         // Paquetes.
         $this->actingAs($regidor)->get("/paquetes/{$paquete->id}/edit")->assertForbidden();
