@@ -270,6 +270,70 @@ class FacturasCompraPorAreaTest extends TestCase
         $this->assertSame($cabildo->id, $factura->fresh()->area_id);
     }
 
+    public function test_el_comando_asigna_cada_factura_sin_dueno_a_quien_la_subio(): void
+    {
+        $cabildo = Area::create(['nombre' => 'Cabildo', 'tipo' => Area::TIPO_REGIDURIA, 'privada' => true]);
+        $ana = $this->usuario('Apoyos', $cabildo);
+        $luis = $this->usuario('Apoyos', $cabildo);
+        $alta = fn (User $user, string $tabla, int $id) => DB::table('auditoria')->insert([
+            'user_id' => $user->id, 'accion' => 'alta', 'tabla' => $tabla,
+            'auditable_id' => (string) $id, 'lote' => 'x', 'created_at' => now(),
+        ]);
+        $apoyoCon = function (User $user, FacturaCompra $factura) {
+            $apoyo = Apoyo::create([
+                'fecha' => '2026-11-01',
+                'beneficiario_id' => Beneficiario::create(['nombre' => 'B'])->id,
+                'persona_apoya_id' => PersonaApoya::create(['nombre' => 'P'])->id,
+                'user_id' => $user->id,
+            ]);
+            $apoyo->detalles()->create([
+                'articulo_factura_compra_id' => $this->articulo($factura)->id,
+                'cantidad' => 1, 'articulo' => 'DESPENSA', 'costo_unidad' => 10, 'iva' => 0, 'sub_total' => 10, 'total' => 10,
+            ]);
+        };
+
+        $porBitacora = $this->factura(null, 'Por bitácora');
+        $alta($ana, 'facturas_compra', $porBitacora->id);
+
+        $porPaquete = $this->factura(null, 'Por paquete');
+        $alta($luis, 'paquetes', Paquete::create(['factura_compra_id' => $porPaquete->id, 'nombre' => 'P'])->id);
+
+        $porApoyos = $this->factura(null, 'Por apoyos');
+        $apoyoCon($ana, $porApoyos);
+
+        $deVarios = $this->factura(null, 'De varios');
+        $apoyoCon($ana, $deVarios);
+        $apoyoCon($luis, $deVarios);
+
+        $sinPista = $this->factura(null, 'Sin pista');
+
+        $yaConDueno = $this->factura($cabildo, 'Ya con dueño');
+        $yaConDueno->update(['user_id' => $luis->id]);
+        $alta($ana, 'facturas_compra', $yaConDueno->id);
+
+        // --pretend no cambia nada.
+        $this->artisan('facturas-compra:asignar-duenos', ['--pretend' => true])->assertSuccessful();
+        $this->assertNull($porBitacora->fresh()->user_id);
+
+        $this->artisan('facturas-compra:asignar-duenos')
+            ->expectsOutputToContain('Se asignaron 3 factura(s)')
+            ->expectsOutputToContain('2 factura(s) sin dueño claro')
+            ->assertSuccessful();
+
+        $this->assertSame([$ana->id, $cabildo->id], [$porBitacora->fresh()->user_id, $porBitacora->fresh()->area_id]);
+        $this->assertSame($luis->id, $porPaquete->fresh()->user_id);
+        $this->assertSame($ana->id, $porApoyos->fresh()->user_id);
+        $this->assertNull($deVarios->fresh()->user_id);
+        $this->assertNull($sinPista->fresh()->user_id);
+        $this->assertSame($luis->id, $yaConDueno->fresh()->user_id);
+
+        // En Cabildo cada quien ve ahora solo las suyas.
+        $this->assertSame(['Por apoyos', 'Por bitácora'], $this->emisoresQueVe($ana));
+        $this->assertSame(['Por paquete', 'Ya con dueño'], $this->emisoresQueVe($luis));
+
+        $this->artisan('facturas-compra:asignar-duenos')->expectsOutputToContain('2 factura(s) sin dueño claro')->assertSuccessful();
+    }
+
     public function test_la_migracion_recupera_de_la_bitacora_quien_subio_cada_factura(): void
     {
         $quienSubio = $this->usuario('Apoyos', $this->regidorA);

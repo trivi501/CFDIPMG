@@ -35,6 +35,7 @@ php artisan migrate            # correr migraciones (MySQL local vía Laragon, v
 php artisan db:seed            # roles/permisos + usuario admin (ver DatabaseSeeder)
 php artisan permisos:sincronizar [--pretend]   # agrega permisos/roles nuevos del catálogo sin quitar nada
 php artisan areas:revisar     # solo lectura: qué áreas son privadas y quién ve las facturas de todos
+php artisan facturas-compra:asignar-duenos [--pretend]   # da dueño a las facturas de compra sin dueño (bitácora, paquetes, apoyos); no pisa las que ya tienen
 php artisan app:create-api-client "Nombre"   # genera una API key para que un sistema externo empuje recibos
 php artisan wayfinder:generate --with-form   # regenerar las acciones TS tras cambiar rutas/controllers
 ```

@@ -85,9 +85,17 @@ export default function FacturasCompraIndex({
     );
 
     // En un área privada cada quien ve solo sus facturas: se elige de quién es entre sus integrantes.
+    // También en las que aún no tienen área ni dueño, para asignarlas en un solo paso.
+    const eligeDueno = (factura: Factura) =>
+        factura.area_id === null
+            ? factura.user_id === null
+            : areasPrivadas.has(factura.area_id);
+
     const integrantesPara = (factura: Factura) => {
+        // Sin área todavía: cualquiera; al elegirlo, la factura toma su área.
         const lista = usuarios.filter(
-            (usuario) => usuario.area_id === factura.area_id,
+            (usuario) =>
+                factura.area_id === null || usuario.area_id === factura.area_id,
         );
 
         if (factura.user && !lista.some((u) => u.id === factura.user_id)) {
@@ -252,46 +260,41 @@ export default function FacturasCompraIndex({
                                         </NativeSelect>
                                     </div>
                                 )}
-                                {puedeAsignarArea &&
-                                    factura.area_id !== null &&
-                                    areasPrivadas.has(factura.area_id) && (
-                                        <div className="w-64">
-                                            <NativeSelect
-                                                aria-label={`De quién es la factura de ${factura.emisor ?? 'compra'}`}
-                                                value={String(
-                                                    factura.user_id ?? '',
-                                                )}
-                                                onChange={(e) =>
-                                                    asignarUsuario(
-                                                        factura,
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            >
-                                                {factura.user_id === null && (
-                                                    <option value="" disabled>
-                                                        Elige de quién es
+                                {puedeAsignarArea && eligeDueno(factura) && (
+                                    <div className="w-64">
+                                        <NativeSelect
+                                            aria-label={`De quién es la factura de ${factura.emisor ?? 'compra'}`}
+                                            value={String(
+                                                factura.user_id ?? '',
+                                            )}
+                                            onChange={(e) =>
+                                                asignarUsuario(
+                                                    factura,
+                                                    e.target.value,
+                                                )
+                                            }
+                                        >
+                                            {factura.user_id === null && (
+                                                <option value="" disabled>
+                                                    Elige de quién es
+                                                </option>
+                                            )}
+                                            {integrantesPara(factura).map(
+                                                (usuario) => (
+                                                    <option
+                                                        key={usuario.id}
+                                                        value={usuario.id}
+                                                    >
+                                                        {usuario.name}
                                                     </option>
-                                                )}
-                                                {integrantesPara(factura).map(
-                                                    (usuario) => (
-                                                        <option
-                                                            key={usuario.id}
-                                                            value={usuario.id}
-                                                        >
-                                                            {usuario.name}
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </NativeSelect>
-                                        </div>
-                                    )}
+                                                ),
+                                            )}
+                                        </NativeSelect>
+                                    </div>
+                                )}
                                 {puedeAsignarArea &&
                                     factura.user &&
-                                    !(
-                                        factura.area_id !== null &&
-                                        areasPrivadas.has(factura.area_id)
-                                    ) && (
+                                    !eligeDueno(factura) && (
                                         <span className="text-sm text-muted-foreground">
                                             Subió: {factura.user.name}
                                         </span>
