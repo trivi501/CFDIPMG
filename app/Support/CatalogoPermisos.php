@@ -72,7 +72,52 @@ final class CatalogoPermisos
         ],
     ];
 
+    /**
+     * Cómo se muestra cada permiso en la pantalla de Roles. Un permiso nuevo necesita su texto aquí.
+     *
+     * @var array<string, array{grupo: string, etiqueta: string}>
+     */
+    public const ETIQUETAS = [
+        'receipts.view' => ['grupo' => 'Recibos', 'etiqueta' => 'Ver recibos de pago'],
+        'receipts.import' => ['grupo' => 'Recibos', 'etiqueta' => 'Buscar e importar folios'],
+        'invoices.view' => ['grupo' => 'Facturas', 'etiqueta' => 'Ver facturas'],
+        'invoices.create' => ['grupo' => 'Facturas', 'etiqueta' => 'Emitir facturas'],
+        'invoices.cancel' => ['grupo' => 'Facturas', 'etiqueta' => 'Cancelar facturas'],
+        'invoices.download' => ['grupo' => 'Facturas', 'etiqueta' => 'Descargar PDF y XML de facturas'],
+        'customers.view' => ['grupo' => 'Clientes y productos', 'etiqueta' => 'Ver clientes'],
+        'customers.manage' => ['grupo' => 'Clientes y productos', 'etiqueta' => 'Crear y editar clientes'],
+        'products.view' => ['grupo' => 'Clientes y productos', 'etiqueta' => 'Ver productos'],
+        'products.manage' => ['grupo' => 'Clientes y productos', 'etiqueta' => 'Crear y editar productos'],
+        'apoyos.view' => ['grupo' => 'Apoyos', 'etiqueta' => 'Ver apoyos (los suyos y de su área)'],
+        'apoyos.manage' => ['grupo' => 'Apoyos', 'etiqueta' => 'Capturar y editar apoyos'],
+        'apoyos.approve' => ['grupo' => 'Apoyos', 'etiqueta' => 'Aprobar y rechazar apoyos'],
+        'apoyos.facturar' => ['grupo' => 'Apoyos', 'etiqueta' => 'Facturar apoyos aprobados'],
+        'apoyos.view-all' => ['grupo' => 'Apoyos', 'etiqueta' => 'Ver apoyos y facturas de compra de todas las áreas'],
+        'apoyos.download-all' => ['grupo' => 'Apoyos', 'etiqueta' => 'Descargar los XML de compras de apoyos facturados'],
+        'users.manage' => ['grupo' => 'Administración', 'etiqueta' => 'Administrar usuarios y áreas'],
+        'roles.manage' => ['grupo' => 'Administración', 'etiqueta' => 'Administrar roles y permisos'],
+        'settings.manage' => ['grupo' => 'Administración', 'etiqueta' => 'Configuración del sistema'],
+        'api-clients.manage' => ['grupo' => 'Administración', 'etiqueta' => 'Administrar API clients (sistemas externos)'],
+    ];
+
     public const GUARD = 'web';
+
+    /**
+     * Permisos para la pantalla de Roles: nombre interno, grupo y texto en español. Un permiso sin
+     * texto (p. ej. creado a mano) se muestra con su nombre interno en el grupo "Otros".
+     *
+     * @param  iterable<string>  $nombres
+     * @return list<array{name: string, grupo: string, etiqueta: string}>
+     */
+    public static function paraPantalla(iterable $nombres): array
+    {
+        $lista = [];
+        foreach ($nombres as $nombre) {
+            $lista[] = ['name' => $nombre, ...(self::ETIQUETAS[$nombre] ?? ['grupo' => 'Otros', 'etiqueta' => $nombre])];
+        }
+
+        return $lista;
+    }
 
     /** @return list<string> */
     public static function permisosDe(string $rol): array

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\CatalogoPermisos;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -11,6 +12,26 @@ use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
+    /**
+     * Permisos de la base en el orden del catálogo (agrupados como se muestran); los que no están en
+     * el catálogo, al final.
+     *
+     * @return list<string>
+     */
+    protected static function permisosOrdenados(): array
+    {
+        $orden = array_flip(CatalogoPermisos::PERMISOS);
+
+        $nombres = [];
+        foreach (Permission::all() as $permiso) {
+            $nombres[] = $permiso->name;
+        }
+
+        usort($nombres, fn (string $a, string $b) => [$orden[$a] ?? PHP_INT_MAX, $a] <=> [$orden[$b] ?? PHP_INT_MAX, $b]);
+
+        return $nombres;
+    }
+
     public function index(): Response
     {
         return Inertia::render('roles/index', [
@@ -21,7 +42,7 @@ class RoleController extends Controller
     public function create(): Response
     {
         return Inertia::render('roles/create', [
-            'permissions' => Permission::orderBy('name')->pluck('name'),
+            'permissions' => CatalogoPermisos::paraPantalla(self::permisosOrdenados()),
         ]);
     }
 
@@ -45,7 +66,7 @@ class RoleController extends Controller
     {
         return Inertia::render('roles/edit', [
             'role' => $role->load('permissions:id,name'),
-            'permissions' => Permission::orderBy('name')->pluck('name'),
+            'permissions' => CatalogoPermisos::paraPantalla(self::permisosOrdenados()),
         ]);
     }
 

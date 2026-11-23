@@ -84,7 +84,8 @@ el frontend (`receipts/invoice.tsx` cambia el label y el resumen de totales seg�
 ### Roles y permisos
 
 `spatie/laravel-permission`. El catálogo de permisos y roles de fábrica (Admin, Facturación, Apoyos,
-Consulta) vive en `App\Support\CatalogoPermisos`: un permiso nuevo se agrega ahí. Lo usan
+Consulta) vive en `App\Support\CatalogoPermisos`: un permiso nuevo se agrega ahí, con su texto en
+español en `ETIQUETAS` (la pantalla de Roles lo muestra agrupado; un test exige que exista). Lo usan
 `RolesAndPermissionsSeeder` (instalación nueva; deja los roles exactamente de fábrica) y
 `php artisan permisos:sincronizar` (servidores en uso: solo agrega permisos/roles nuevos, nunca quita;
 lo corre `deploy/deploy.sh`). Las rutas usan middleware `permission:xxx.yyy` (ver `routes/web.php`); los recursos
@@ -97,7 +98,10 @@ vive en el middleware.
 ### Visibilidad por área (regidurías y secretarías)
 
 Los apoyos y las **facturas de compra** son de quien los captura y de su área (`users.area_id`):
-cada regidor ve solo lo suyo y lo de su área; `apoyos.view-all` (Admin, Facturación) ve todo. Para
+cada regidor ve solo lo suyo y lo de su área; `apoyos.view-all` (Admin, Facturación) ve todo. En un
+área **privada** (`areas.privada`, p. ej. Cabildo, donde están juntos varios regidores y sus asistentes)
+cada integrante ve solo lo suyo: usa `$user->areaCompartida()` (null si no comparte) en vez de leer
+`area_id` directo. Para
 facturas de compra usa siempre el scope `FacturaCompra::visiblePara($user)` (lista, XML, inventario
 que se ofrece al capturar apoyos, paquetes); `reserveStock()` rechaza artículos de facturas que el
 usuario no ve. Las facturas sin `user_id` ni `area_id` (subidas antes de que tuvieran dueño) solo las
