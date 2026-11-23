@@ -597,7 +597,8 @@ class ApoyoController extends Controller
     }
 
     /**
-     * Cada usuario ve los apoyos de su área (secretaría o regiduría) y los que él registró.
+     * Cada usuario ve los apoyos que él registró y los de su área (secretaría o regiduría), salvo
+     * en un área privada como Cabildo, donde cada quien ve solo los suyos.
      *
      * @return Builder<Apoyo>
      */
@@ -609,11 +610,13 @@ class ApoyoController extends Controller
             return Apoyo::query();
         }
 
-        return Apoyo::where(function (Builder $query) use ($user) {
+        $area = $user->areaCompartida();
+
+        return Apoyo::where(function (Builder $query) use ($user, $area) {
             $query->where('user_id', $user->id);
 
-            if ($user->area_id !== null) {
-                $query->orWhere('area_id', $user->area_id);
+            if ($area !== null) {
+                $query->orWhere('area_id', $area);
             }
         });
     }
@@ -648,11 +651,12 @@ class ApoyoController extends Controller
     protected function authorizeAccess(Request $request, Apoyo $apoyo): void
     {
         $user = $request->user();
+        $area = $user->areaCompartida();
 
         abort_unless(
             $user->can('apoyos.view-all')
                 || $apoyo->user_id === $user->id
-                || ($user->area_id !== null && $apoyo->area_id === $user->area_id),
+                || ($area !== null && $apoyo->area_id === $area),
             403
         );
     }

@@ -11,7 +11,16 @@ class Area extends Model
 
     public const TIPO_REGIDURIA = 'regiduria';
 
-    protected $fillable = ['nombre', 'tipo'];
+    /**
+     * privada: cada integrante ve solo lo suyo (p. ej. Cabildo, donde están juntos todos los
+     * regidores y sus asistentes). Si no, los integrantes comparten apoyos y facturas de compra.
+     */
+    protected $fillable = ['nombre', 'tipo', 'privada'];
+
+    protected function casts(): array
+    {
+        return ['privada' => 'boolean'];
+    }
 
     /**
      * @return HasMany<User, $this>

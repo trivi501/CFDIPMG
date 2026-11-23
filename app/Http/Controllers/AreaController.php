@@ -56,15 +56,22 @@ class AreaController extends Controller
     }
 
     /**
-     * @return array{nombre: string, tipo: string}
+     * @return array{nombre: string, tipo: string, privada: bool}
      */
     protected function validated(Request $request, ?Area $area = null): array
     {
-        return $request->validate([
+        $request->validate([
             'nombre' => ['required', 'string', 'max:255', Rule::unique('areas', 'nombre')->ignore($area)],
             'tipo' => ['required', Rule::in([Area::TIPO_SECRETARIA, Area::TIPO_REGIDURIA])],
         ], [
             'nombre.unique' => 'Ya existe un área con ese nombre.',
         ]);
+
+        return [
+            'nombre' => $request->string('nombre')->toString(),
+            'tipo' => $request->string('tipo')->toString(),
+            // Casilla del formulario: si no viene marcada, el área no es privada.
+            'privada' => $request->boolean('privada'),
+        ];
     }
 }

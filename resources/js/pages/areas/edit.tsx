@@ -24,6 +24,7 @@ export default function AreaEdit({ area }: { area: AreaOpcion }) {
                                 errors={errors}
                                 nombre={area.nombre}
                                 tipo={area.tipo}
+                                privada={area.privada}
                             />
                             <Button disabled={processing}>
                                 Guardar cambios

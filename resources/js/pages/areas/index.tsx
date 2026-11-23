@@ -21,6 +21,7 @@ type Area = {
     id: number;
     nombre: string;
     tipo: keyof typeof TIPOS_AREA;
+    privada: boolean;
     users_count: number;
 };
 
@@ -68,6 +69,15 @@ export default function AreasIndex({ areas }: { areas: Area[] }) {
                                         <Badge variant="secondary">
                                             {TIPOS_AREA[area.tipo]}
                                         </Badge>
+                                        {area.privada && (
+                                            <Badge
+                                                variant="outline"
+                                                className="ml-1"
+                                                title="Cada integrante ve solo los apoyos y facturas que él captura"
+                                            >
+                                                Cada quien lo suyo
+                                            </Badge>
+                                        )}
                                     </TableCell>
                                     <TableCell>{area.users_count}</TableCell>
                                     <TableCell className="text-right">

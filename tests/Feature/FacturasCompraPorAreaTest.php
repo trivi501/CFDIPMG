@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Apoyo;
 use App\Models\Area;
 use App\Models\ArticuloFacturaCompra;
 use App\Models\Beneficiario;
@@ -97,6 +98,71 @@ class FacturasCompraPorAreaTest extends TestCase
 
         // Lo mismo al capturar un apoyo: solo se ofrecen las facturas de su área.
         $this->assertSame(['De A'], $this->emisoresQueVe($this->usuario('Apoyos', $this->regidorA), '/apoyos/create', 'facturasDisponibles'));
+    }
+
+    public function test_en_un_area_privada_como_cabildo_cada_quien_ve_solo_lo_suyo(): void
+    {
+        $cabildo = Area::create(['nombre' => 'Cabildo', 'tipo' => Area::TIPO_REGIDURIA, 'privada' => true]);
+        $regidor = $this->usuario('Apoyos', $cabildo);
+        $asistenteDeOtro = $this->usuario('Apoyos', $cabildo);
+
+        $suya = $this->factura($cabildo, 'Del regidor');
+        $suya->update(['user_id' => $regidor->id]);
+        $ajena = $this->factura($cabildo, 'Del otro');
+        $ajena->update(['user_id' => $asistenteDeOtro->id]);
+        $paquete = Paquete::create(['factura_compra_id' => $ajena->id, 'nombre' => 'Paquete del otro']);
+
+        // Facturas de compra y su XML.
+        $this->assertSame(['Del regidor'], $this->emisoresQueVe($regidor));
+        $this->assertSame(['Del otro'], $this->emisoresQueVe($asistenteDeOtro));
+        $this->actingAs($regidor)->get("/facturas-compra/{$ajena->id}/xml")->assertForbidden();
+        // Paquetes.
+        $this->actingAs($regidor)->get("/paquetes/{$paquete->id}/edit")->assertForbidden();
+
+        // Apoyos: el del otro integrante de Cabildo no se lista ni se abre.
+        $this->actingAs($asistenteDeOtro)->post('/apoyos', [
+            'fecha' => '2026-11-20',
+            'beneficiario_id' => Beneficiario::create(['nombre' => 'Juan'])->id,
+            'persona_apoya_id' => PersonaApoya::create(['nombre' => 'María'])->id,
+            'detalles' => [['cantidad' => 1, 'articulo' => 'Despensa', 'costo_unidad' => 10, 'iva' => 0]],
+        ])->assertSessionHasNoErrors();
+        $apoyo = Apoyo::sole();
+        $this->assertSame($cabildo->id, $apoyo->area_id);
+
+        $this->actingAs($regidor)->get('/apoyos')->assertInertia(fn ($page) => $page->where('apoyos.total', 0));
+        $this->actingAs($regidor)->get("/apoyos/{$apoyo->id}")->assertForbidden();
+        $this->actingAs($asistenteDeOtro)->get('/apoyos')->assertInertia(fn ($page) => $page->where('apoyos.total', 1));
+    }
+
+    public function test_un_area_no_privada_sigue_compartiendo_entre_sus_integrantes(): void
+    {
+        $secretaria = Area::create(['nombre' => 'Desarrollo Social', 'tipo' => Area::TIPO_SECRETARIA]);
+        $uno = $this->usuario('Apoyos', $secretaria);
+        $otro = $this->usuario('Apoyos', $secretaria);
+        $factura = $this->factura($secretaria, 'De la secretaría');
+        $factura->update(['user_id' => $uno->id]);
+
+        $this->assertSame(['De la secretaría'], $this->emisoresQueVe($otro));
+    }
+
+    public function test_la_migracion_marca_cabildo_como_privada_y_la_pantalla_de_areas_la_cambia(): void
+    {
+        $cabildo = Area::create(['nombre' => ' CABILDO ', 'tipo' => Area::TIPO_REGIDURIA]);
+        $otra = Area::create(['nombre' => 'Cabildo Abierto 2025', 'tipo' => Area::TIPO_SECRETARIA]);
+
+        DB::table('areas')->whereRaw('LOWER(TRIM(nombre)) = ?', ['cabildo'])->update(['privada' => true]);
+        $codigo = (string) file_get_contents(database_path('migrations/2026_11_23_090000_add_privada_to_areas_table.php'));
+        $this->assertStringContainsString("whereRaw('LOWER(TRIM(nombre)) = ?', ['cabildo'])", $codigo);
+
+        $this->assertTrue($cabildo->fresh()->privada);
+        $this->assertFalse($otra->fresh()->privada);
+
+        // Desde la pantalla de Áreas se apaga y se prende con la casilla.
+        $admin = $this->usuario('Admin');
+        $this->actingAs($admin)->put("/areas/{$cabildo->id}", ['nombre' => 'Cabildo', 'tipo' => Area::TIPO_REGIDURIA])->assertRedirect();
+        $this->assertFalse($cabildo->fresh()->privada);
+        $this->actingAs($admin)->put("/areas/{$cabildo->id}", ['nombre' => 'Cabildo', 'tipo' => Area::TIPO_REGIDURIA, 'privada' => 'on'])->assertRedirect();
+        $this->assertTrue($cabildo->fresh()->privada);
     }
 
     public function test_al_subir_una_factura_queda_del_area_de_quien_la_sube(): void

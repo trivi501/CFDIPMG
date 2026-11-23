@@ -56,8 +56,8 @@ class FacturaCompra extends Model
 
     /**
      * Facturas que el usuario puede ver y cuyo inventario puede usar: las que subió él y las de su
-     * área (regiduría o secretaría), igual que los apoyos. Con apoyos.view-all, todas. Las que no
-     * tienen dueño ni área solo las ve quien tiene apoyos.view-all.
+     * área (regiduría o secretaría), igual que los apoyos; en un área privada, solo las suyas. Con
+     * apoyos.view-all, todas. Las que no tienen dueño ni área solo las ve quien tiene apoyos.view-all.
      *
      * @param  Builder<FacturaCompra>  $query
      */
@@ -67,11 +67,14 @@ class FacturaCompra extends Model
             return;
         }
 
-        $query->where(function (Builder $query) use ($user) {
+        // En un área privada (como Cabildo) cada quien ve solo las facturas que subió.
+        $area = $user->areaCompartida();
+
+        $query->where(function (Builder $query) use ($user, $area) {
             $query->where('user_id', $user->id);
 
-            if ($user->area_id !== null) {
-                $query->orWhere('area_id', $user->area_id);
+            if ($area !== null) {
+                $query->orWhere('area_id', $area);
             }
         });
     }

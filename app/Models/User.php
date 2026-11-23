@@ -61,4 +61,17 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->belongsTo(Area::class);
     }
+
+    /**
+     * Área cuyos apoyos y facturas de compra comparte este usuario con los demás integrantes, o null
+     * si solo ve lo suyo: no tiene área, o su área es privada (como Cabildo).
+     */
+    public function areaCompartida(): ?int
+    {
+        if ($this->area_id === null || $this->area?->privada) {
+            return null;
+        }
+
+        return $this->area_id;
+    }
 }
