@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Area;
 use App\Models\FacturaCompra;
+use App\Models\User;
 use App\Services\Cfdi\CfdiXmlParser;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -26,10 +27,12 @@ class FacturaCompraController extends Controller
 
         return Inertia::render('facturas-compra/index', [
             'facturas' => FacturaCompra::visiblePara($request->user())
-                ->with('articulos', 'area:id,nombre')
+                ->with('articulos', 'area:id,nombre', 'user:id,name')
                 ->latest('fecha')
                 ->get(),
-            'areas' => $puedeAsignar ? Area::orderBy('nombre')->get(['id', 'nombre']) : [],
+            'areas' => $puedeAsignar ? Area::orderBy('nombre')->get(['id', 'nombre', 'privada']) : [],
+            // Para elegir de quién es cada factura de un área privada (Cabildo).
+            'usuarios' => $puedeAsignar ? User::whereNotNull('area_id')->orderBy('name')->get(['id', 'name', 'area_id']) : [],
             'puedeAsignarArea' => $puedeAsignar,
         ]);
     }
@@ -143,6 +146,24 @@ class FacturaCompraController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => $factura->area_id === null
             ? 'La factura quedó sin área: solo la ven Admin y Facturación.'
             : 'Área asignada a la factura.']);
+
+        return back();
+    }
+
+    /**
+     * En un área privada (Cabildo) cada quien ve solo sus facturas: si la subió un asistente a
+     * nombre de su regidor, aquí se pasa al regidor. La factura toma el área de su nuevo dueño.
+     */
+    public function asignarUsuario(Request $request, FacturaCompra $factura): RedirectResponse
+    {
+        $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $usuario = User::whereKey($request->integer('user_id'))->firstOrFail();
+        $factura->update(['user_id' => $usuario->id, 'area_id' => $usuario->area_id ?? $factura->area_id]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => "La factura ahora es de {$usuario->name}."]);
 
         return back();
     }

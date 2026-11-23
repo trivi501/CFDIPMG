@@ -245,6 +245,31 @@ class FacturasCompraPorAreaTest extends TestCase
         $this->assertSame(['Sin area'], $this->emisoresQueVe($regidorA));
     }
 
+    public function test_el_admin_pasa_una_factura_de_cabildo_del_asistente_a_su_regidor(): void
+    {
+        $cabildo = Area::create(['nombre' => 'Cabildo', 'tipo' => Area::TIPO_REGIDURIA, 'privada' => true]);
+        $regidor = $this->usuario('Apoyos', $cabildo);
+        $asistente = $this->usuario('Apoyos', $cabildo);
+        $factura = $this->factura($cabildo, 'Subida por el asistente');
+        $factura->update(['user_id' => $asistente->id]);
+
+        // Nadie más que Admin y Facturación puede cambiar el dueño.
+        $this->actingAs($asistente)->patch("/facturas-compra/{$factura->id}/usuario", ['user_id' => $regidor->id])->assertForbidden();
+        $this->assertSame($asistente->id, $factura->fresh()->user_id);
+
+        $admin = $this->usuario('Admin');
+        $this->actingAs($admin)->get('/facturas-compra')->assertInertia(fn ($page) => $page
+            ->where('facturas.0.user.id', $asistente->id)
+            ->where('areas.0.privada', true)
+            ->has('usuarios', 2));
+
+        $this->actingAs($admin)->patch("/facturas-compra/{$factura->id}/usuario", ['user_id' => $regidor->id])->assertRedirect();
+
+        $this->assertSame(['Subida por el asistente'], $this->emisoresQueVe($regidor));
+        $this->assertSame([], $this->emisoresQueVe($asistente));
+        $this->assertSame($cabildo->id, $factura->fresh()->area_id);
+    }
+
     public function test_la_migracion_recupera_de_la_bitacora_quien_subio_cada_factura(): void
     {
         $quienSubio = $this->usuario('Apoyos', $this->regidorA);

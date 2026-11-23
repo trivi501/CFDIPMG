@@ -105,6 +105,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('facturas-compra/{factura}/area', [FacturaCompraController::class, 'asignarArea'])
             ->middleware('permission:apoyos.view-all')
             ->name('facturas-compra.area');
+        Route::patch('facturas-compra/{factura}/usuario', [FacturaCompraController::class, 'asignarUsuario'])
+            ->middleware('permission:apoyos.view-all')
+            ->name('facturas-compra.usuario');
         Route::patch('apoyos/{apoyo}/reabrir', [ApoyoController::class, 'reabrir'])
             ->middleware('permission:apoyos.manage')
             ->name('apoyos.reabrir');

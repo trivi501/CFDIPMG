@@ -42,6 +42,8 @@ type Factura = {
     xml_path: string;
     area_id: number | null;
     area: { id: number; nombre: string } | null;
+    user_id: number | null;
+    user: { id: number; name: string } | null;
     articulos: Articulo[];
 };
 
@@ -53,10 +55,12 @@ const currency = new Intl.NumberFormat('es-MX', {
 export default function FacturasCompraIndex({
     facturas,
     areas,
+    usuarios,
     puedeAsignarArea,
 }: {
     facturas: Factura[];
-    areas: { id: number; nombre: string }[];
+    areas: { id: number; nombre: string; privada: boolean }[];
+    usuarios: { id: number; name: string; area_id: number }[];
     puedeAsignarArea: boolean;
 }) {
     const { can } = usePermissions();
@@ -68,6 +72,31 @@ export default function FacturasCompraIndex({
             { area_id: areaId === '' ? null : Number(areaId) },
             { preserveScroll: true },
         );
+
+    const asignarUsuario = (factura: Factura, userId: string) =>
+        router.patch(
+            facturasCompra.usuario(factura.id).url,
+            { user_id: Number(userId) },
+            { preserveScroll: true },
+        );
+
+    const areasPrivadas = new Set(
+        areas.filter((area) => area.privada).map((area) => area.id),
+    );
+
+    // En un área privada cada quien ve solo sus facturas: se elige de quién es entre sus integrantes.
+    const integrantesPara = (factura: Factura) => {
+        const lista = usuarios.filter(
+            (usuario) => usuario.area_id === factura.area_id,
+        );
+
+        if (factura.user && !lista.some((u) => u.id === factura.user_id)) {
+            lista.unshift({ ...factura.user, area_id: -1 });
+        }
+
+        return lista;
+    };
+
     const { data, setData, post, processing, errors, reset } = useForm({
         xml: null as File | null,
     });
@@ -86,7 +115,8 @@ export default function FacturasCompraIndex({
         value: String(factura.id),
         label:
             (factura.emisor ?? 'Factura de compra') +
-            (factura.fecha ? ` · ${fechaMx(factura.fecha)}` : ''),
+            (factura.fecha ? ` · ${fechaMx(factura.fecha)}` : '') +
+            (puedeAsignarArea && factura.user ? ` · ${factura.user.name}` : ''),
     }));
 
     const facturasAMostrar = selectedFacturaId
@@ -222,6 +252,50 @@ export default function FacturasCompraIndex({
                                         </NativeSelect>
                                     </div>
                                 )}
+                                {puedeAsignarArea &&
+                                    factura.area_id !== null &&
+                                    areasPrivadas.has(factura.area_id) && (
+                                        <div className="w-64">
+                                            <NativeSelect
+                                                aria-label={`De quién es la factura de ${factura.emisor ?? 'compra'}`}
+                                                value={String(
+                                                    factura.user_id ?? '',
+                                                )}
+                                                onChange={(e) =>
+                                                    asignarUsuario(
+                                                        factura,
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            >
+                                                {factura.user_id === null && (
+                                                    <option value="" disabled>
+                                                        Elige de quién es
+                                                    </option>
+                                                )}
+                                                {integrantesPara(factura).map(
+                                                    (usuario) => (
+                                                        <option
+                                                            key={usuario.id}
+                                                            value={usuario.id}
+                                                        >
+                                                            {usuario.name}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </NativeSelect>
+                                        </div>
+                                    )}
+                                {puedeAsignarArea &&
+                                    factura.user &&
+                                    !(
+                                        factura.area_id !== null &&
+                                        areasPrivadas.has(factura.area_id)
+                                    ) && (
+                                        <span className="text-sm text-muted-foreground">
+                                            Subió: {factura.user.name}
+                                        </span>
+                                    )}
                                 <a
                                     href={facturasCompra.xml(factura.id).url}
                                     className="text-sm text-primary underline"
