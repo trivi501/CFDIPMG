@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -92,5 +93,29 @@ class Apoyo extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    /**
+     * Apoyos que el usuario puede ver: los suyos y los de su área (si no es privada);
+     * apoyos.view-all ve todos.
+     *
+     * @param  Builder<Apoyo>  $query
+     * @return Builder<Apoyo>
+     */
+    public function scopeVisiblePara(Builder $query, User $user): Builder
+    {
+        if ($user->can('apoyos.view-all')) {
+            return $query;
+        }
+
+        $area = $user->areaCompartida();
+
+        return $query->where(function (Builder $query) use ($user, $area) {
+            $query->where('user_id', $user->id);
+
+            if ($area !== null) {
+                $query->orWhere('area_id', $area);
+            }
+        });
     }
 }

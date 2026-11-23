@@ -604,21 +604,7 @@ class ApoyoController extends Controller
      */
     protected function visibleApoyos(Request $request): Builder
     {
-        $user = $request->user();
-
-        if ($user->can('apoyos.view-all')) {
-            return Apoyo::query();
-        }
-
-        $area = $user->areaCompartida();
-
-        return Apoyo::where(function (Builder $query) use ($user, $area) {
-            $query->where('user_id', $user->id);
-
-            if ($area !== null) {
-                $query->orWhere('area_id', $area);
-            }
-        });
+        return Apoyo::query()->visiblePara($request->user());
     }
 
     /**

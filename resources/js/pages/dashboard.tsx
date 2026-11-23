@@ -1,4 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
+import type { Graficas } from '@/components/dashboard-graficas';
+import { DashboardGraficas } from '@/components/dashboard-graficas';
 import { EstatusBadge } from '@/components/estatus-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { nombreReceptor } from '@/lib/receptor';
@@ -24,6 +26,7 @@ type PageProps = {
         totalAmountThisMonth: string;
     };
     recentInvoices: Invoice[];
+    graficas: Graficas | null;
 };
 
 const currency = new Intl.NumberFormat('es-MX', {
@@ -31,7 +34,11 @@ const currency = new Intl.NumberFormat('es-MX', {
     currency: 'MXN',
 });
 
-export default function Dashboard({ stats, recentInvoices }: PageProps) {
+export default function Dashboard({
+    stats,
+    recentInvoices,
+    graficas,
+}: PageProps) {
     return (
         <>
             <Head title="Dashboard" />
@@ -80,6 +87,8 @@ export default function Dashboard({ stats, recentInvoices }: PageProps) {
                         </CardContent>
                     </Card>
                 </div>
+
+                {graficas && <DashboardGraficas graficas={graficas} />}
 
                 <Card className="flex-1">
                     <CardHeader>
