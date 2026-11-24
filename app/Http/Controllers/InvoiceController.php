@@ -122,8 +122,12 @@ class InvoiceController extends Controller
 
         $sufijo = ['xml' => 'xml', 'pdf' => 'pdf', 'ambos' => 'xml-pdf'][$formato];
 
-        return response()->download($zipPath, "facturas-{$sufijo}-".now('America/Mexico_City')->format('Y-m-d').'.zip')
-            ->deleteFileAfterSend();
+        // Una sola factura (botón del detalle): el ZIP lleva su folio en el nombre.
+        $nombreZip = $invoices->count() === 1
+            ? 'factura-'.trim(($invoices->first()->series ?? '').($invoices->first()->folio ?? $invoices->first()->uuid ?? ''))."-{$sufijo}.zip"
+            : "facturas-{$sufijo}-".now('America/Mexico_City')->format('Y-m-d').'.zip';
+
+        return response()->download($zipPath, $nombreZip)->deleteFileAfterSend();
     }
 
     /**

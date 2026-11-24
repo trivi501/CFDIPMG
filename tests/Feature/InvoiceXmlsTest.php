@@ -141,6 +141,26 @@ class InvoiceXmlsTest extends TestCase
         $this->assertSame(['A101-uuid-101.pdf' => '%PDF-101'], $this->contenidoDelZip($pdf->baseResponse));
     }
 
+    public function test_el_zip_de_una_sola_factura_lleva_su_folio_en_el_nombre(): void
+    {
+        Http::fake([
+            '*/invoices/fact_101/xml' => Http::response('<cfdi>101</cfdi>'),
+            '*/invoices/fact_101/pdf' => Http::response('%PDF-101'),
+        ]);
+
+        $factura = $this->factura('101', 'Juan Pérez', 'PEPJ800101AAA');
+
+        $response = $this->actingAs($this->usuario())
+            ->get('/invoices/xmls?'.http_build_query(['ids' => [$factura->id], 'formato' => 'ambos']))
+            ->assertOk();
+
+        $this->assertStringContainsString('factura-A101-xml-pdf.zip', (string) $response->headers->get('content-disposition'));
+        $this->assertSame([
+            'A101-uuid-101.xml' => '<cfdi>101</cfdi>',
+            'A101-uuid-101.pdf' => '%PDF-101',
+        ], $this->contenidoDelZip($response->baseResponse));
+    }
+
     public function test_con_pdf_el_tope_de_facturas_es_menor(): void
     {
         $ids = range(1, 101);

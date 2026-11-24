@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { Ban, FileText, FileType } from 'lucide-react';
+import { Ban, FileArchive, FileText, FileType } from 'lucide-react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EnviarFacturaCorreo } from '@/components/enviar-factura-correo';
 import { EstatusBadge } from '@/components/estatus-badge';
@@ -211,6 +211,18 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                                 <Button variant="outline" asChild>
                                     <a href={invoices.xml(invoice).url}>
                                         <FileType /> XML
+                                    </a>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                    <a
+                                        href={invoices.xmls.url({
+                                            query: {
+                                                ids: [invoice.id],
+                                                formato: 'ambos',
+                                            },
+                                        })}
+                                    >
+                                        <FileArchive /> ZIP (XML y PDF)
                                     </a>
                                 </Button>
                                 <EnviarFacturaCorreo
