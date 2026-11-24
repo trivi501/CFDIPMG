@@ -6,6 +6,7 @@ use App\Http\Controllers\AreaController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\Auth\CambiarPasswordController;
 use App\Http\Controllers\BeneficiarioController;
+use App\Http\Controllers\ClaveSatController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FacturaCompraController;
@@ -87,6 +88,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('permission:products.view')->group(function () {
+        Route::resource('claves-sat', ClaveSatController::class)
+            ->parameters(['claves-sat' => 'claveSat'])
+            ->except(['show'])
+            ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:products.manage');
         Route::resource('products', ProductController::class)
             ->except(['show'])
             ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:products.manage');

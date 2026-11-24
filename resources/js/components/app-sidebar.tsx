@@ -12,6 +12,7 @@ import {
     Receipt,
     ScrollText,
     ShieldCheck,
+    Tags,
     UserCheck,
     UserCog,
     Users,
@@ -36,6 +37,7 @@ import apoyos from '@/routes/apoyos';
 import areas from '@/routes/areas';
 import auditoria from '@/routes/auditoria';
 import beneficiarios from '@/routes/beneficiarios';
+import clavesSat from '@/routes/claves-sat';
 import customers from '@/routes/customers';
 import facturasCompra from '@/routes/facturas-compra';
 import invoices from '@/routes/invoices';
@@ -83,6 +85,11 @@ export function AppSidebar() {
             title: 'Productos',
             href: products.index(),
             icon: Package,
+        });
+        mainNavItems.push({
+            title: 'Claves SAT',
+            href: clavesSat.index(),
+            icon: Tags,
         });
     }
 

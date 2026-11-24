@@ -43,6 +43,7 @@ class ReceiptController extends Controller
             'receipt' => $receipt,
             'customers' => Customer::orderBy('legal_name')->get(['id', 'legal_name', 'rfc', 'tax_system']),
             'products' => Product::where('is_active', true)->orderBy('description')->get(),
+            'clavesSat' => ClaveSatController::paraFacturar(),
             'pagos' => $pagos['data'] ?? null,
             'suggestedCustomerId' => $pagos['suggestedCustomerId'] ?? null,
             'suggestedPaymentForm' => $pagos['suggestedPaymentForm'] ?? null,

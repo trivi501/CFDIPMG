@@ -12,6 +12,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
+    cambiosPorClave,
+    claveDelCatalogo,
+    ClavesSatSugerencias,
+    LISTA_CLAVES_SAT,
+} from '@/lib/claves-sat';
+import type { ClaveSat } from '@/lib/claves-sat';
+import {
     PAYMENT_FORMS,
     PAYMENT_METHODS,
     pickUseForRegime,
@@ -56,9 +63,11 @@ function emptyItem(): Item {
 export default function InvoiceCreate({
     customers,
     products,
+    clavesSat,
 }: {
     customers: Customer[];
     products: Product[];
+    clavesSat: ClaveSat[];
 }) {
     const { data, setData, post, processing, errors } = useForm({
         customer_id: '',
@@ -142,6 +151,7 @@ export default function InvoiceCreate({
                 />
 
                 <form onSubmit={submit} className="max-w-3xl space-y-6">
+                    <ClavesSatSugerencias claves={clavesSat} />
                     <Card>
                         <CardHeader>
                             <CardTitle>Datos del cliente y CFDI</CardTitle>
@@ -342,14 +352,29 @@ export default function InvoiceCreate({
                                             <Input
                                                 value={item.sat_product_key}
                                                 onChange={(e) =>
-                                                    updateItem(index, {
-                                                        sat_product_key:
+                                                    updateItem(
+                                                        index,
+                                                        cambiosPorClave(
+                                                            clavesSat,
+                                                            item,
                                                             e.target.value,
-                                                    })
+                                                        ),
+                                                    )
                                                 }
+                                                list={LISTA_CLAVES_SAT}
+                                                placeholder="Escribe la clave o búscala por concepto"
                                                 maxLength={8}
                                                 required
                                             />
+                                            {claveDelCatalogo(
+                                                clavesSat,
+                                                item.sat_product_key,
+                                            ) && (
+                                                <p className="text-xs text-green-600 dark:text-green-400">
+                                                    Unidad y concepto tomados
+                                                    del catálogo de claves SAT.
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="grid gap-2">
                                             <Label>Clave SAT unidad</Label>

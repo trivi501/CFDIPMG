@@ -110,6 +110,7 @@ class InvoiceController extends Controller
         return Inertia::render('invoices/create', [
             'customers' => Customer::orderBy('legal_name')->get(['id', 'legal_name', 'rfc', 'tax_system']),
             'products' => Product::where('is_active', true)->orderBy('description')->get(),
+            'clavesSat' => ClaveSatController::paraFacturar(),
         ]);
     }
 
