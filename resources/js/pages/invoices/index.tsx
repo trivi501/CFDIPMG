@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { FileDown, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, FileDown, Plus, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { EstatusBadge, etiquetaEstatus } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
@@ -8,6 +8,12 @@ import type { Paginator } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Table,
@@ -41,8 +47,16 @@ type Invoice = {
 type PageProps = {
     invoices: Paginator<Invoice>;
     filters: { status?: string; search?: string };
-    maxXmls: number;
+    maxPorFormato: Record<FormatoZip, number>;
 };
+
+type FormatoZip = 'ambos' | 'xml' | 'pdf';
+
+const FORMATOS_ZIP: { formato: FormatoZip; etiqueta: string }[] = [
+    { formato: 'ambos', etiqueta: 'XML y PDF' },
+    { formato: 'xml', etiqueta: 'Solo XML' },
+    { formato: 'pdf', etiqueta: 'Solo PDF' },
+];
 
 /** Solo las facturas timbradas tienen XML. */
 const tieneXml = (invoice: Invoice) =>
@@ -59,7 +73,7 @@ const currency = new Intl.NumberFormat('es-MX', {
 export default function InvoicesIndex({
     invoices: paginator,
     filters,
-    maxXmls,
+    maxPorFormato,
 }: PageProps) {
     const { can } = usePermissions();
     const puedeDescargar = can('invoices.download');
@@ -99,10 +113,10 @@ export default function InvoicesIndex({
             return nueva;
         });
 
-    const excedido = seleccion.size > maxXmls;
-    const urlZip = invoices.xmls.url({
-        query: { ids: [...seleccion.keys()] },
-    });
+    const urlZip = (formato: FormatoZip) =>
+        invoices.xmls.url({
+            query: { ids: [...seleccion.keys()], formato },
+        });
 
     // Búsqueda en el servidor, con una pausa para no consultar en cada tecla.
     const [busqueda, setBusqueda] = useState(filters.search ?? '');
@@ -248,18 +262,43 @@ export default function InvoicesIndex({
                             >
                                 Quitar todas
                             </Button>
-                            {excedido ? (
-                                <Button size="sm" disabled>
-                                    Máximo {maxXmls} por descarga
-                                </Button>
-                            ) : (
-                                <Button size="sm" asChild>
-                                    <a href={urlZip}>
-                                        <FileDown /> Descargar XML (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button size="sm">
+                                        <FileDown /> Descargar ZIP (
                                         {seleccion.size})
-                                    </a>
-                                </Button>
-                            )}
+                                        <ChevronDown />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    {FORMATOS_ZIP.map(
+                                        ({ formato, etiqueta }) => {
+                                            const maximo =
+                                                maxPorFormato[formato];
+                                            const excedido =
+                                                seleccion.size > maximo;
+
+                                            return excedido ? (
+                                                <DropdownMenuItem
+                                                    key={formato}
+                                                    disabled
+                                                >
+                                                    {etiqueta} (máx. {maximo})
+                                                </DropdownMenuItem>
+                                            ) : (
+                                                <DropdownMenuItem
+                                                    key={formato}
+                                                    asChild
+                                                >
+                                                    <a href={urlZip(formato)}>
+                                                        {etiqueta}
+                                                    </a>
+                                                </DropdownMenuItem>
+                                            );
+                                        },
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     </div>
                 )}

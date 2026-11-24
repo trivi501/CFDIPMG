@@ -109,6 +109,52 @@ class InvoiceXmlsTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_el_zip_puede_llevar_xml_y_pdf_o_solo_pdf(): void
+    {
+        Http::fake([
+            '*/invoices/fact_101/xml' => Http::response('<cfdi>101</cfdi>'),
+            '*/invoices/fact_101/pdf' => Http::response('%PDF-101'),
+            '*/invoices/fact_202/xml' => Http::response('<cfdi>202</cfdi>'),
+            '*/invoices/fact_202/pdf' => Http::response('%PDF-202'),
+        ]);
+
+        $a = $this->factura('101', 'Juan Pérez', 'PEPJ800101AAA');
+        $b = $this->factura('202', 'Comercial del Norte', 'CNO010101BBB');
+        $user = $this->usuario();
+
+        $ambos = $this->actingAs($user)
+            ->get('/invoices/xmls?'.http_build_query(['ids' => [$a->id, $b->id], 'formato' => 'ambos']))
+            ->assertOk();
+
+        $this->assertStringContainsString('facturas-xml-pdf-', (string) $ambos->headers->get('content-disposition'));
+        $this->assertSame([
+            'A101-uuid-101.xml' => '<cfdi>101</cfdi>',
+            'A101-uuid-101.pdf' => '%PDF-101',
+            'A202-uuid-202.xml' => '<cfdi>202</cfdi>',
+            'A202-uuid-202.pdf' => '%PDF-202',
+        ], $this->contenidoDelZip($ambos->baseResponse));
+
+        $pdf = $this->actingAs($user)
+            ->get('/invoices/xmls?'.http_build_query(['ids' => [$a->id], 'formato' => 'pdf']))
+            ->assertOk();
+
+        $this->assertSame(['A101-uuid-101.pdf' => '%PDF-101'], $this->contenidoDelZip($pdf->baseResponse));
+    }
+
+    public function test_con_pdf_el_tope_de_facturas_es_menor(): void
+    {
+        $ids = range(1, 101);
+        $user = $this->usuario();
+
+        $this->actingAs($user)
+            ->get('/invoices/xmls?'.http_build_query(['ids' => $ids, 'formato' => 'ambos']))
+            ->assertSessionHasErrors(['ids' => 'Puedes descargar máximo 100 facturas a la vez en este formato.']);
+
+        $this->actingAs($user)
+            ->get('/invoices/xmls?'.http_build_query(['ids' => $ids, 'formato' => 'xml']))
+            ->assertSessionHasNoErrors();
+    }
+
     public function test_si_facturapi_falla_en_una_la_anota_y_entrega_las_demas(): void
     {
         Http::fake([

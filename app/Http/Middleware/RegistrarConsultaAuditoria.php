@@ -20,7 +20,7 @@ class RegistrarConsultaAuditoria
     private const RUTAS = [
         'invoices.pdf' => ['descarga', 'PDF de factura', 'invoices', 'invoice'],
         'invoices.xml' => ['descarga', 'XML de factura', 'invoices', 'invoice'],
-        'invoices.xmls' => ['descarga', 'ZIP con XML de facturas seleccionadas', 'invoices', null],
+        'invoices.xmls' => ['descarga', 'ZIP con XML y/o PDF de facturas seleccionadas', 'invoices', null],
         'facturas-compra.xml' => ['descarga', 'XML de factura de compra', 'facturas_compra', 'factura'],
         'apoyos.documento' => ['descarga', 'Documento de apoyo', 'apoyos', 'apoyo'],
         'apoyos.descargar-xmls' => ['descarga', 'ZIP con los XML de apoyos', 'apoyos', null],

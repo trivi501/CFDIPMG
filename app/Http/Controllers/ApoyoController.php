@@ -514,7 +514,7 @@ class ApoyoController extends Controller
     public function facturasXml(Request $request, FacturapiClient $facturapi): BinaryFileResponse|HttpResponse
     {
         $data = $request->validate([
-            'ids' => ['required', 'array', 'min:1', 'max:'.InvoiceController::MAX_XMLS],
+            'ids' => ['required', 'array', 'min:1', 'max:'.InvoiceController::MAX_POR_FORMATO['xml']],
             'ids.*' => ['integer'],
         ]);
 

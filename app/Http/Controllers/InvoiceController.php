@@ -22,8 +22,11 @@ use ZipArchive;
 
 class InvoiceController extends Controller
 {
-    /** Tope de facturas por ZIP: cada XML es una petición a Facturapi. */
-    public const MAX_XMLS = 200;
+    /**
+     * Tope de facturas por ZIP según lo que lleva: cada archivo es una petición a Facturapi (los PDF
+     * tardan más) y el servidor corta la respuesta a los 5 minutos.
+     */
+    public const MAX_POR_FORMATO = ['xml' => 200, 'pdf' => 100, 'ambos' => 100];
 
     public function index(Request $request): Response
     {
@@ -47,20 +50,32 @@ class InvoiceController extends Controller
         return Inertia::render('invoices/index', [
             'invoices' => $invoices,
             'filters' => $request->only('status', 'search'),
-            'maxXmls' => self::MAX_XMLS,
+            'maxPorFormato' => self::MAX_POR_FORMATO,
         ]);
     }
 
     /**
-     * ZIP con los XML de las facturas marcadas en la lista. Las que no están timbradas (fallidas)
-     * se omiten, y si Facturapi no entrega alguna se anota en ERRORES.txt en vez de abortar todo.
+     * ZIP con el XML, el PDF o ambos de las facturas marcadas en la lista. Las que no están
+     * timbradas (fallidas) se omiten, y si Facturapi no entrega algún archivo se anota en
+     * ERRORES.txt en vez de abortar todo.
      */
     public function xmls(Request $request, FacturapiClient $facturapi): BinaryFileResponse|HttpResponse
     {
+        $formato = $request->input('formato', 'xml');
+        $formato = is_string($formato) && isset(self::MAX_POR_FORMATO[$formato]) ? $formato : 'xml';
+
         $data = $request->validate([
-            'ids' => ['required', 'array', 'min:1', 'max:'.self::MAX_XMLS],
+            'ids' => ['required', 'array', 'min:1', 'max:'.self::MAX_POR_FORMATO[$formato]],
             'ids.*' => ['integer'],
+        ], [
+            'ids.max' => 'Puedes descargar máximo :max facturas a la vez en este formato.',
         ]);
+
+        $extensiones = match ($formato) {
+            'pdf' => ['pdf'],
+            'ambos' => ['xml', 'pdf'],
+            default => ['xml'],
+        };
 
         $invoices = Invoice::whereIn('id', $data['ids'])
             ->whereNotNull('facturapi_invoice_id')
@@ -68,10 +83,10 @@ class InvoiceController extends Controller
             ->get();
 
         if ($invoices->isEmpty()) {
-            return response('Ninguna de las facturas seleccionadas tiene XML (solo las timbradas lo tienen).', 404);
+            return response('Ninguna de las facturas seleccionadas tiene XML ni PDF (solo las timbradas los tienen).', 404);
         }
 
-        $zipPath = tempnam(sys_get_temp_dir(), 'facturas-xml');
+        $zipPath = tempnam(sys_get_temp_dir(), 'facturas-zip');
 
         if ($zipPath === false) {
             abort(500, 'No se pudo preparar el archivo ZIP.');
@@ -82,23 +97,32 @@ class InvoiceController extends Controller
         $errores = [];
 
         foreach ($invoices as $invoice) {
-            $nombre = trim(($invoice->series ?? '').($invoice->folio ?? '').'-'.$invoice->uuid, '-').'.xml';
+            $base = trim(($invoice->series ?? '').($invoice->folio ?? '').'-'.$invoice->uuid, '-');
 
-            try {
-                $zip->addFromString($nombre, $facturapi->downloadXml((string) $invoice->facturapi_invoice_id)->body());
-            } catch (Throwable $e) {
-                Log::warning('No se pudo descargar el XML de la factura', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
-                $errores[] = "{$nombre}: {$e->getMessage()}";
+            foreach ($extensiones as $extension) {
+                $nombre = "{$base}.{$extension}";
+
+                try {
+                    $archivo = $extension === 'pdf'
+                        ? $facturapi->downloadPdf((string) $invoice->facturapi_invoice_id)
+                        : $facturapi->downloadXml((string) $invoice->facturapi_invoice_id);
+                    $zip->addFromString($nombre, $archivo->body());
+                } catch (Throwable $e) {
+                    Log::warning('No se pudo descargar un archivo de la factura', ['invoice_id' => $invoice->id, 'archivo' => $extension, 'error' => $e->getMessage()]);
+                    $errores[] = "{$nombre}: {$e->getMessage()}";
+                }
             }
         }
 
         if ($errores !== []) {
-            $zip->addFromString('ERRORES.txt', "No se pudieron descargar estos XML:\n\n".implode("\n", $errores)."\n");
+            $zip->addFromString('ERRORES.txt', "No se pudieron descargar estos archivos:\n\n".implode("\n", $errores)."\n");
         }
 
         $zip->close();
 
-        return response()->download($zipPath, 'facturas-xml-'.now('America/Mexico_City')->format('Y-m-d').'.zip')
+        $sufijo = ['xml' => 'xml', 'pdf' => 'pdf', 'ambos' => 'xml-pdf'][$formato];
+
+        return response()->download($zipPath, "facturas-{$sufijo}-".now('America/Mexico_City')->format('Y-m-d').'.zip')
             ->deleteFileAfterSend();
     }
 
