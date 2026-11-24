@@ -1,5 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
+import { BuscadorConcepto } from '@/components/buscador-concepto';
+import type { SugerenciaConcepto } from '@/components/buscador-concepto';
 import Heading from '@/components/heading';
 import {
     calcularImpuestos,
@@ -114,6 +116,33 @@ export default function InvoiceCreate({
             unit_price: product.unit_price,
         });
     };
+
+    // Conceptos que se sugieren al escribir la descripción: productos (con precio) y claves SAT.
+    const sugerencias: SugerenciaConcepto[] = [
+        ...products.map((p) => ({
+            clave: `producto-${p.id}`,
+            descripcion: p.description,
+            claveSat: p.sat_product_key,
+            unidad: p.sat_unit_key,
+            precio: p.unit_price,
+            origen: 'Producto' as const,
+        })),
+        ...clavesSat.map((c) => ({
+            clave: `clave-${c.id}`,
+            descripcion: c.concepto,
+            claveSat: c.clave,
+            unidad: c.unidad,
+            origen: 'Clave SAT' as const,
+        })),
+    ];
+
+    const aplicarSugerencia = (index: number, s: SugerenciaConcepto) =>
+        updateItem(index, {
+            description: s.descripcion,
+            sat_product_key: s.claveSat,
+            sat_unit_key: s.unidad,
+            ...(s.precio !== undefined ? { unit_price: s.precio } : {}),
+        });
 
     const addItem = () => setData('items', [...data.items, emptyItem()]);
 
@@ -334,14 +363,17 @@ export default function InvoiceCreate({
                                     <div className="grid gap-3 sm:grid-cols-2">
                                         <div className="grid gap-2 sm:col-span-2">
                                             <Label>Descripción</Label>
-                                            <Input
+                                            <BuscadorConcepto
                                                 value={item.description}
-                                                onChange={(e) =>
+                                                onChange={(texto) =>
                                                     updateItem(index, {
-                                                        description:
-                                                            e.target.value,
+                                                        description: texto,
                                                     })
                                                 }
+                                                onElegir={(s) =>
+                                                    aplicarSugerencia(index, s)
+                                                }
+                                                sugerencias={sugerencias}
                                                 required
                                             />
                                         </div>
