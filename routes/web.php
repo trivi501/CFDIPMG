@@ -76,6 +76,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('invoices/{invoice}/xml', [InvoiceController::class, 'xml'])
             ->middleware('permission:invoices.download')
             ->name('invoices.xml');
+        Route::post('invoices/{invoice}/email', [InvoiceController::class, 'email'])
+            ->middleware(['permission:invoices.download', 'throttle:10,1'])
+            ->name('invoices.email');
         Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])
             ->middleware('permission:invoices.cancel')
             ->name('invoices.cancel');

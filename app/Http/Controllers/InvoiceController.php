@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Auditoria;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Product;
@@ -177,6 +178,68 @@ class InvoiceController extends Controller
             'Content-Type' => 'application/xml',
             'Content-Disposition' => 'attachment; filename="factura-'.$invoice->folio.'.xml"',
         ]);
+    }
+
+    /** Máximo de destinatarios por envío. */
+    public const MAX_CORREOS = 10;
+
+    /**
+     * Envía por correo el PDF y el XML de la factura (lo hace Facturapi). Se puede guardar el
+     * correo en el cliente si no tenía, y el envío queda en la bitácora con sus destinatarios.
+     */
+    public function email(Request $request, Invoice $invoice, FacturapiClient $facturapi): RedirectResponse
+    {
+        if ($invoice->status !== 'valid' || $invoice->facturapi_invoice_id === null) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Solo se pueden enviar facturas vigentes.']);
+
+            return back();
+        }
+
+        // Los correos llegan como texto separado por comas, punto y coma o espacios.
+        $request->merge([
+            'emails' => collect(preg_split('/[\s,;]+/', (string) $request->input('emails')) ?: [])
+                ->filter()
+                ->unique()
+                ->values()
+                ->all(),
+        ]);
+
+        $data = $request->validate([
+            'emails' => ['required', 'array', 'min:1', 'max:'.self::MAX_CORREOS],
+            'emails.*' => ['email'],
+            'guardar_en_cliente' => ['sometimes', 'boolean'],
+        ], [
+            'emails.required' => 'Escribe al menos un correo.',
+            'emails.max' => 'Puedes enviar a máximo '.self::MAX_CORREOS.' correos a la vez.',
+            'emails.*.email' => '":input" no es un correo válido.',
+        ]);
+
+        try {
+            $facturapi->sendInvoiceByEmail($invoice->facturapi_invoice_id, $data['emails']);
+        } catch (Throwable $e) {
+            Log::warning('No se pudo enviar la factura por correo', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Facturapi no pudo enviar el correo: '.$e->getMessage()]);
+
+            return back();
+        }
+
+        $customer = $invoice->customer;
+
+        if (($data['guardar_en_cliente'] ?? false) && $customer !== null && blank($customer->email)) {
+            $customer->update(['email' => $data['emails'][0]]);
+        }
+
+        Auditoria::escribir([
+            'accion' => 'envío',
+            'tabla' => 'invoices',
+            'auditable_id' => $invoice->id,
+            'descripcion' => 'Factura enviada por correo '.trim(($invoice->series ?? '').' '.($invoice->folio ?? $invoice->uuid ?? '')),
+            'despues' => ['para' => implode(', ', $data['emails'])],
+        ]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Factura enviada a '.implode(', ', $data['emails']).'.']);
+
+        return back();
     }
 
     public function cancel(Invoice $invoice, InvoiceService $invoiceService): RedirectResponse

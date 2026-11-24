@@ -25,7 +25,7 @@ class Auditoria extends Model
 
     public const ACCIONES = [
         'alta', 'modificación', 'eliminación', 'cambio masivo',
-        'descarga', 'consulta',
+        'descarga', 'consulta', 'envío',
         'inicio de sesión', 'cierre de sesión', 'acceso fallido',
     ];
 

@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { Ban, FileText, FileType } from 'lucide-react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EnviarFacturaCorreo } from '@/components/enviar-factura-correo';
 import { EstatusBadge } from '@/components/estatus-badge';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
@@ -195,7 +196,7 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                 </div>
 
                 {invoice.status === 'valid' && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         {can('invoices.download') && (
                             <>
                                 <Button variant="outline" asChild>
@@ -212,6 +213,12 @@ export default function InvoiceShow({ invoice }: { invoice: Invoice }) {
                                         <FileType /> XML
                                     </a>
                                 </Button>
+                                <EnviarFacturaCorreo
+                                    invoiceId={invoice.id}
+                                    correoCliente={
+                                        invoice.customer?.email ?? null
+                                    }
+                                />
                             </>
                         )}
                         {can('invoices.cancel') && (

@@ -12,6 +12,7 @@ const VARIANTES: Record<
     'cambio masivo': 'secondary',
     descarga: 'outline',
     consulta: 'outline',
+    envío: 'outline',
     'inicio de sesión': 'outline',
     'cierre de sesión': 'outline',
     'acceso fallido': 'destructive',

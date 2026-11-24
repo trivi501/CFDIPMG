@@ -52,4 +52,16 @@ class FacturapiClient
     {
         return $this->client()->get("/invoices/{$facturapiInvoiceId}/xml")->throw();
     }
+
+    /**
+     * Facturapi envía la factura (PDF y XML adjuntos) a estos correos. La emisión no la manda sola.
+     *
+     * @param  list<string>  $emails
+     */
+    public function sendInvoiceByEmail(string $facturapiInvoiceId, array $emails): Response
+    {
+        return $this->client()
+            ->post("/invoices/{$facturapiInvoiceId}/email", ['email' => $emails])
+            ->throw();
+    }
 }

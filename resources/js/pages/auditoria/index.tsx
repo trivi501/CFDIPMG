@@ -96,7 +96,7 @@ export default function AuditoriaIndex({
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <Heading
                     title="Bitácora de auditoría"
-                    description="Quién dio de alta, modificó o eliminó cada registro (con el valor anterior y el nuevo), los cambios masivos, las descargas de PDF y XML y los accesos al sistema. Los movimientos de una misma operación se ven juntos con el enlace de la operación."
+                    description="Quién dio de alta, modificó o eliminó cada registro (con el valor anterior y el nuevo), los cambios masivos, las descargas de PDF y XML, los envíos de facturas por correo y los accesos al sistema. Los movimientos de una misma operación se ven juntos con el enlace de la operación."
                 />
 
                 <div className="flex flex-wrap items-center gap-2">
