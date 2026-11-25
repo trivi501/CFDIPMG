@@ -147,7 +147,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('beneficiarios', BeneficiarioController::class)
             ->except(['show'])
             ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');
+        // El parámetro tiene que llamarse como la variable del controller ($personaApoya); con el
+        // nombre por defecto ({personas_apoya}) no se encuentra el registro y editar/eliminar no hacen nada.
         Route::resource('personas-apoya', PersonaApoyaController::class)
+            ->parameters(['personas-apoya' => 'personaApoya'])
             ->except(['show'])
             ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'permission:apoyos.manage');
     });

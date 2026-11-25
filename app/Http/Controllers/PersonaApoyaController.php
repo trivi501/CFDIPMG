@@ -62,6 +62,18 @@ class PersonaApoyaController extends Controller
 
     public function destroy(PersonaApoya $personaApoya): RedirectResponse
     {
+        // Los apoyos la referencian (llave foránea): borrarla rompería su historial.
+        $apoyos = $personaApoya->apoyos()->count();
+
+        if ($apoyos > 0) {
+            Inertia::flash('toast', [
+                'type' => 'error',
+                'message' => "No se puede eliminar a {$personaApoya->nombre}: tiene {$apoyos} apoyo(s) registrado(s). Puedes editar su nombre.",
+            ]);
+
+            return back();
+        }
+
         $personaApoya->delete();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Persona apoya eliminada.']);

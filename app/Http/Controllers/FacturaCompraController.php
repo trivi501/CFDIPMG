@@ -25,11 +25,25 @@ class FacturaCompraController extends Controller
     {
         $puedeAsignar = $request->user()->can('apoyos.view-all');
 
+        $facturas = FacturaCompra::visiblePara($request->user())
+            ->with('articulos', 'area:id,nombre', 'user:id,name')
+            ->latest('fecha')
+            ->get();
+
+        // En cuántos apoyos se usó cada factura (los mismos que lista el enlace "Ver apoyos").
+        $apoyosPorFactura = DB::table('detalle_apoyos')
+            ->join('articulos_factura_compra', 'articulos_factura_compra.id', '=', 'detalle_apoyos.articulo_factura_compra_id')
+            ->whereIn('articulos_factura_compra.factura_compra_id', $facturas->modelKeys())
+            ->groupBy('articulos_factura_compra.factura_compra_id')
+            ->selectRaw('articulos_factura_compra.factura_compra_id, COUNT(DISTINCT detalle_apoyos.apoyo_id) as apoyos')
+            ->pluck('apoyos', 'factura_compra_id');
+
         return Inertia::render('facturas-compra/index', [
-            'facturas' => FacturaCompra::visiblePara($request->user())
-                ->with('articulos', 'area:id,nombre', 'user:id,name')
-                ->latest('fecha')
-                ->get(),
+            'facturas' => $facturas->map(fn (FacturaCompra $factura) => [
+                ...$factura->toArray(),
+                ...$factura->resumenDeUso(),
+                'apoyos_count' => (int) ($apoyosPorFactura[$factura->id] ?? 0),
+            ]),
             'areas' => $puedeAsignar ? Area::orderBy('nombre')->get(['id', 'nombre', 'privada']) : [],
             // Para elegir de quién es cada factura de un área privada (Cabildo).
             'usuarios' => $puedeAsignar ? User::whereNotNull('area_id')->orderBy('name')->get(['id', 'name', 'area_id']) : [],

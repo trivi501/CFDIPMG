@@ -79,6 +79,38 @@ class FacturaCompra extends Model
         });
     }
 
+    /**
+     * Cuánto de la factura ya se repartió en apoyos y cuánto falta, según el inventario que queda
+     * (un apoyo rechazado ya devolvió lo suyo). El IVA de cada artículo se reparte en proporción a
+     * la cantidad. Requiere los artículos cargados.
+     *
+     * @return array{monto_total: float, monto_asignado: float, monto_por_asignar: float}
+     */
+    public function resumenDeUso(): array
+    {
+        $total = 0.0;
+        $porAsignar = 0.0;
+
+        foreach ($this->articulos as $articulo) {
+            $cantidad = (float) $articulo->cantidad_total;
+            $disponible = (float) $articulo->cantidad_disponible;
+            $iva = (float) $articulo->iva;
+            $costo = (float) $articulo->costo_unidad;
+
+            $total += $cantidad * $costo + $iva;
+            $porAsignar += $disponible * $costo + ($cantidad > 0 ? $iva * $disponible / $cantidad : 0);
+        }
+
+        $total = round($total, 2);
+        $porAsignar = round($porAsignar, 2);
+
+        return [
+            'monto_total' => $total,
+            'monto_asignado' => round($total - $porAsignar, 2),
+            'monto_por_asignar' => $porAsignar,
+        ];
+    }
+
     public function esVisiblePara(User $user): bool
     {
         return self::query()->visiblePara($user)->whereKey($this->getKey())->exists();

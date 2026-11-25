@@ -1,13 +1,11 @@
-import { Head, router, useForm } from '@inertiajs/react';
-import { Upload } from 'lucide-react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { ExternalLink, Search, Upload, X } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Combobox } from '@/components/ui/combobox';
-import type { ComboboxOption } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -22,7 +20,9 @@ import {
 } from '@/components/ui/table';
 import { usePermissions } from '@/hooks/use-permissions';
 import { fechaMx } from '@/lib/fechas';
+import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import apoyos from '@/routes/apoyos';
 import facturasCompra from '@/routes/facturas-compra';
 
 type Articulo = {
@@ -36,6 +36,7 @@ type Articulo = {
 
 type Factura = {
     id: number;
+    uuid: string | null;
     emisor: string | null;
     fecha: string | null;
     total: string;
@@ -45,7 +46,46 @@ type Factura = {
     user_id: number | null;
     user: { id: number; name: string } | null;
     articulos: Articulo[];
+    monto_total: number;
+    monto_asignado: number;
+    monto_por_asignar: number;
+    apoyos_count: number;
 };
+
+type Estado = 'sin-usar' | 'parcial' | 'liquidada';
+
+/** Liquidada: ya no queda nada por repartir. Sin usar: todavía no sale nada en apoyos. */
+function estadoDe(factura: Factura): Estado {
+    if (factura.monto_por_asignar <= 0.005) {
+        return 'liquidada';
+    }
+
+    return factura.monto_asignado <= 0.005 ? 'sin-usar' : 'parcial';
+}
+
+const ESTADOS: Record<Estado, { label: string; className: string }> = {
+    'sin-usar': {
+        label: 'Sin usar',
+        className: 'border-transparent bg-muted text-muted-foreground',
+    },
+    parcial: {
+        label: 'Parcial',
+        className:
+            'border-transparent bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
+    },
+    liquidada: {
+        label: 'Liquidada',
+        className:
+            'border-transparent bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200',
+    },
+};
+
+function normalizar(texto: string): string {
+    return texto
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+}
 
 const currency = new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -117,19 +157,33 @@ export default function FacturasCompraIndex({
         });
     };
 
-    const [selectedFacturaId, setSelectedFacturaId] = useState('');
+    const [buscar, setBuscar] = useState('');
+    const [filtroArea, setFiltroArea] = useState('');
+    const [filtroEstado, setFiltroEstado] = useState('');
+    const hayFiltros = Boolean(buscar.trim() || filtroArea || filtroEstado);
 
-    const facturaOptions: ComboboxOption[] = facturas.map((factura) => ({
-        value: String(factura.id),
-        label:
-            (factura.emisor ?? 'Factura de compra') +
-            (factura.fecha ? ` · ${fechaMx(factura.fecha)}` : '') +
-            (puedeAsignarArea && factura.user ? ` · ${factura.user.name}` : ''),
-    }));
-
-    const facturasAMostrar = selectedFacturaId
-        ? facturas.filter((factura) => String(factura.id) === selectedFacturaId)
-        : facturas;
+    // Se filtra aquí mismo: la pantalla ya trae todas las facturas que el usuario puede ver.
+    const termino = normalizar(buscar.trim());
+    const facturasAMostrar = facturas.filter(
+        (factura) =>
+            (!termino ||
+                normalizar(
+                    [
+                        factura.emisor,
+                        factura.uuid,
+                        factura.fecha ? fechaMx(factura.fecha) : '',
+                        factura.user?.name,
+                        ...factura.articulos.map((a) => a.descripcion),
+                    ]
+                        .filter(Boolean)
+                        .join(' '),
+                ).includes(termino)) &&
+            (!filtroArea ||
+                (filtroArea === 'sin-area'
+                    ? factura.area_id === null
+                    : String(factura.area_id) === filtroArea)) &&
+            (!filtroEstado || estadoDe(factura) === filtroEstado),
+    );
 
     return (
         <>
@@ -189,29 +243,95 @@ export default function FacturasCompraIndex({
                 )}
 
                 {facturas.length > 0 && (
-                    <div className="flex max-w-sm items-end gap-2">
-                        <div className="grid flex-1 gap-2">
-                            <Label htmlFor="buscar_factura">
-                                Buscar factura
+                    <div className="flex flex-wrap items-end gap-2">
+                        <div className="grid w-full gap-1 sm:w-80">
+                            <Label htmlFor="buscar_factura" className="text-xs">
+                                Buscar
                             </Label>
-                            <Combobox
-                                id="buscar_factura"
-                                options={facturaOptions}
-                                value={selectedFacturaId}
-                                onChange={setSelectedFacturaId}
-                                placeholder="Busca por proveedor o fecha"
-                            />
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    id="buscar_factura"
+                                    type="search"
+                                    value={buscar}
+                                    onChange={(e) => setBuscar(e.target.value)}
+                                    placeholder="Proveedor, UUID, artículo o fecha…"
+                                    className="pl-8"
+                                />
+                            </div>
                         </div>
-                        {selectedFacturaId && (
+                        {puedeAsignarArea && areas.length > 0 && (
+                            <div className="grid w-full gap-1 sm:w-56">
+                                <Label
+                                    htmlFor="filtro_area_factura"
+                                    className="text-xs"
+                                >
+                                    Área
+                                </Label>
+                                <NativeSelect
+                                    id="filtro_area_factura"
+                                    value={filtroArea}
+                                    onChange={(e) =>
+                                        setFiltroArea(e.target.value)
+                                    }
+                                >
+                                    <option value="">Todas las áreas</option>
+                                    <option value="sin-area">Sin área</option>
+                                    {areas.map((area) => (
+                                        <option key={area.id} value={area.id}>
+                                            {area.nombre}
+                                        </option>
+                                    ))}
+                                </NativeSelect>
+                            </div>
+                        )}
+                        <div className="grid w-full gap-1 sm:w-44">
+                            <Label
+                                htmlFor="filtro_estado_factura"
+                                className="text-xs"
+                            >
+                                Estado
+                            </Label>
+                            <NativeSelect
+                                id="filtro_estado_factura"
+                                value={filtroEstado}
+                                onChange={(e) =>
+                                    setFiltroEstado(e.target.value)
+                                }
+                            >
+                                <option value="">Todas</option>
+                                <option value="sin-usar">Sin usar</option>
+                                <option value="parcial">
+                                    Parcial (falta por asignar)
+                                </option>
+                                <option value="liquidada">Liquidada</option>
+                            </NativeSelect>
+                        </div>
+                        {hayFiltros && (
                             <Button
                                 type="button"
-                                variant="outline"
-                                onClick={() => setSelectedFacturaId('')}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setBuscar('');
+                                    setFiltroArea('');
+                                    setFiltroEstado('');
+                                }}
                             >
-                                Ver todas
+                                <X /> Limpiar filtros
                             </Button>
                         )}
+                        <span className="pb-2 text-sm text-muted-foreground">
+                            {facturasAMostrar.length} de {facturas.length}{' '}
+                            factura(s)
+                        </span>
                     </div>
+                )}
+
+                {facturas.length > 0 && facturasAMostrar.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                        Ninguna factura coincide con los filtros.
+                    </p>
                 )}
 
                 {facturasAMostrar.map((factura) => (
@@ -228,6 +348,19 @@ export default function FacturasCompraIndex({
                                     <Badge variant="outline" className="ml-2">
                                         {factura.area.nombre}
                                     </Badge>
+                                )}
+                                <Badge
+                                    className={cn(
+                                        'ml-2',
+                                        ESTADOS[estadoDe(factura)].className,
+                                    )}
+                                >
+                                    {ESTADOS[estadoDe(factura)].label}
+                                </Badge>
+                                {factura.uuid && (
+                                    <div className="mt-1 font-mono text-xs font-normal break-all text-muted-foreground">
+                                        UUID {factura.uuid}
+                                    </div>
                                 )}
                             </CardTitle>
                             <div className="flex flex-wrap items-center gap-3">
@@ -307,7 +440,8 @@ export default function FacturasCompraIndex({
                                 </a>
                             </div>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="grid gap-4">
+                            <ResumenDeUso factura={factura} />
                             <div className="overflow-x-auto rounded-lg border">
                                 <Table>
                                     <TableHeader>
@@ -379,3 +513,92 @@ FacturasCompraIndex.layout = {
         { title: 'Facturas de compra', href: facturasCompra.index() },
     ],
 };
+
+/** Cuánto de la factura ya se asignó a apoyos, cuánto falta para liquidarla y enlace a esos apoyos. */
+function ResumenDeUso({ factura }: { factura: Factura }) {
+    const porcentaje =
+        factura.monto_total > 0
+            ? Math.min(
+                  100,
+                  Math.round(
+                      (factura.monto_asignado / factura.monto_total) * 100,
+                  ),
+              )
+            : 0;
+    const estado = estadoDe(factura);
+
+    return (
+        <div className="grid gap-2 rounded-lg border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-sm">
+                <div className="flex flex-wrap gap-x-6 gap-y-1">
+                    <span>
+                        <span className="text-muted-foreground">Total </span>
+                        <span className="font-medium tabular-nums">
+                            {currency.format(factura.monto_total)}
+                        </span>
+                    </span>
+                    <span>
+                        <span className="text-muted-foreground">
+                            Asignado a apoyos{' '}
+                        </span>
+                        <span className="font-medium tabular-nums">
+                            {currency.format(factura.monto_asignado)}
+                        </span>
+                    </span>
+                    <span>
+                        <span className="text-muted-foreground">
+                            Falta para liquidar{' '}
+                        </span>
+                        <span
+                            className={cn(
+                                'font-semibold tabular-nums',
+                                estado === 'liquidada'
+                                    ? 'text-emerald-700 dark:text-emerald-400'
+                                    : 'text-amber-700 dark:text-amber-400',
+                            )}
+                        >
+                            {currency.format(factura.monto_por_asignar)}
+                        </span>
+                    </span>
+                </div>
+                {factura.apoyos_count > 0 ? (
+                    <Link
+                        href={apoyos.index({
+                            query: { factura: factura.id },
+                        })}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                        <ExternalLink className="size-4" />
+                        Ver {factura.apoyos_count} apoyo
+                        {factura.apoyos_count === 1 ? '' : 's'} con esta factura
+                    </Link>
+                ) : (
+                    <span className="text-sm text-muted-foreground">
+                        Aún no está asignada a ningún apoyo
+                    </span>
+                )}
+            </div>
+            <div
+                className="h-2 overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-valuenow={porcentaje}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Porcentaje asignado a apoyos"
+            >
+                <div
+                    className={cn(
+                        'h-full rounded-full',
+                        estado === 'liquidada'
+                            ? 'bg-emerald-500'
+                            : 'bg-amber-500',
+                    )}
+                    style={{ width: `${porcentaje}%` }}
+                />
+            </div>
+            <span className="text-xs text-muted-foreground">
+                {porcentaje}% asignado
+            </span>
+        </div>
+    );
+}

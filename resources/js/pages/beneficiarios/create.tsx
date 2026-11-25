@@ -32,6 +32,33 @@ export default function BeneficiarioCreate() {
                                 <InputError message={errors.nombre} />
                             </div>
 
+                            <div className="grid gap-2">
+                                <Label htmlFor="rfc">RFC</Label>
+                                <Input
+                                    id="rfc"
+                                    name="rfc"
+                                    maxLength={13}
+                                    className="uppercase"
+                                />
+                                <InputError message={errors.rfc} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="curp">CURP</Label>
+                                <Input
+                                    id="curp"
+                                    name="curp"
+                                    maxLength={18}
+                                    className="uppercase"
+                                />
+                                <InputError message={errors.curp} />
+                                <p className="text-xs text-muted-foreground">
+                                    Se llenan solos al capturarle un apoyo, y se
+                                    actualizan con los que se escriban en el
+                                    apoyo.
+                                </p>
+                            </div>
+
                             <div className="flex gap-2">
                                 <Button disabled={processing}>Guardar</Button>
                             </div>

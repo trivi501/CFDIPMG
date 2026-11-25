@@ -14,7 +14,10 @@ class BeneficiarioController extends Controller
     public function index(Request $request): Response
     {
         $beneficiarios = Beneficiario::query()
-            ->when($request->string('search')->toString(), fn ($query, $search) => $query->where('nombre', 'like', "%{$search}%"))
+            ->when($request->string('search')->toString(), fn ($query, $search) => $query->where(fn ($q) => $q
+                ->where('nombre', 'like', "%{$search}%")
+                ->orWhere('rfc', 'like', "%{$search}%")
+                ->orWhere('curp', 'like', "%{$search}%")))
             ->orderBy('nombre')
             ->paginate(15)
             ->withQueryString();
@@ -32,11 +35,7 @@ class BeneficiarioController extends Controller
 
     public function store(Request $request): RedirectResponse|JsonResponse
     {
-        $data = $request->validate([
-            'nombre' => ['required', 'string', 'max:255'],
-        ]);
-
-        $beneficiario = Beneficiario::create($data);
+        $beneficiario = Beneficiario::create($this->validated($request));
 
         if ($request->wantsJson()) {
             return response()->json($beneficiario);
@@ -54,11 +53,7 @@ class BeneficiarioController extends Controller
 
     public function update(Request $request, Beneficiario $beneficiario): RedirectResponse
     {
-        $data = $request->validate([
-            'nombre' => ['required', 'string', 'max:255'],
-        ]);
-
-        $beneficiario->update($data);
+        $beneficiario->update($this->validated($request));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Beneficiario actualizado.']);
 
@@ -67,10 +62,40 @@ class BeneficiarioController extends Controller
 
     public function destroy(Beneficiario $beneficiario): RedirectResponse
     {
+        // Los apoyos lo referencian (llave foránea): borrarlo rompería su historial.
+        $apoyos = $beneficiario->apoyos()->count();
+
+        if ($apoyos > 0) {
+            Inertia::flash('toast', [
+                'type' => 'error',
+                'message' => "No se puede eliminar a {$beneficiario->nombre}: tiene {$apoyos} apoyo(s) registrado(s). Puedes editar sus datos.",
+            ]);
+
+            return back();
+        }
+
         $beneficiario->delete();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Beneficiario eliminado.']);
 
         return to_route('beneficiarios.index');
+    }
+
+    /**
+     * @return array{nombre: string, rfc: ?string, curp: ?string}
+     */
+    protected function validated(Request $request): array
+    {
+        $request->merge([
+            'rfc' => Beneficiario::normalizarClave($request->input('rfc')),
+            'curp' => Beneficiario::normalizarClave($request->input('curp')),
+        ]);
+
+        /** @var array{nombre: string, rfc: ?string, curp: ?string} */
+        return $request->validate([
+            'nombre' => ['required', 'string', 'max:255'],
+            'rfc' => ['nullable', 'string', 'max:13'],
+            'curp' => ['nullable', 'string', 'max:18'],
+        ]);
     }
 }

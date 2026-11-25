@@ -93,11 +93,18 @@ type Filtros = {
     desde?: string;
     hasta?: string;
     area?: number | string;
+    factura?: number | string;
 };
 
 type PageProps = {
     apoyos: Paginator<Apoyo>;
     filters: Filtros;
+    facturaFiltrada: {
+        id: number;
+        uuid: string | null;
+        emisor: string | null;
+        fecha: string | null;
+    } | null;
     areas: { id: number; nombre: string }[];
     pendientes: { preparados: number; aprobados: number };
 };
@@ -129,6 +136,7 @@ const currency = new Intl.NumberFormat('es-MX', {
 export default function ApoyosIndex({
     apoyos: paginator,
     filters,
+    facturaFiltrada,
     areas,
     pendientes,
 }: PageProps) {
@@ -156,7 +164,8 @@ export default function ApoyosIndex({
         filters.buscar ||
         filters.desde ||
         filters.hasta ||
-        filters.area,
+        filters.area ||
+        filters.factura,
     );
 
     // La búsqueda espera a que se deje de escribir para no consultar en cada tecla.
@@ -510,7 +519,7 @@ export default function ApoyosIndex({
                                 type="search"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
-                                placeholder="Beneficiario, persona que apoya o RFC…"
+                                placeholder="Beneficiario, RFC, proveedor o UUID…"
                                 className="pl-8"
                             />
                         </div>
@@ -579,6 +588,41 @@ export default function ApoyosIndex({
                         </Button>
                     )}
                 </div>
+
+                {filters.factura && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200">
+                        <span>
+                            Mostrando los apoyos que usan la factura de compra{' '}
+                            <strong>
+                                {facturaFiltrada
+                                    ? (facturaFiltrada.emisor ??
+                                      'Factura de compra')
+                                    : `#${filters.factura}`}
+                            </strong>
+                            {facturaFiltrada?.fecha &&
+                                ` · ${fechaMx(facturaFiltrada.fecha)}`}
+                            {facturaFiltrada?.uuid && (
+                                <span className="ml-1 font-mono text-xs">
+                                    ({facturaFiltrada.uuid})
+                                </span>
+                            )}
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm" asChild>
+                                <Link href={facturasCompra.index()}>
+                                    Ver facturas de compra
+                                </Link>
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => filtrar({ factura: undefined })}
+                            >
+                                <X /> Quitar
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex flex-wrap items-center gap-1">
                     {[
@@ -737,8 +781,20 @@ export default function ApoyosIndex({
                                             : apoyo.facturas_compra.map(
                                                   (factura) => (
                                                       <div key={factura.id}>
-                                                          {factura.emisor ??
-                                                              'Factura de compra'}
+                                                          <button
+                                                              type="button"
+                                                              onClick={() =>
+                                                                  filtrar({
+                                                                      factura:
+                                                                          factura.id,
+                                                                  })
+                                                              }
+                                                              title="Ver todos los apoyos de esta factura"
+                                                              className="text-left hover:underline"
+                                                          >
+                                                              {factura.emisor ??
+                                                                  'Factura de compra'}
+                                                          </button>
                                                           {factura.uuid && (
                                                               <a
                                                                   href={

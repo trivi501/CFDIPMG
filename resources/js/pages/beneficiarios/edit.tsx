@@ -8,7 +8,12 @@ import { Label } from '@/components/ui/label';
 import { dashboard } from '@/routes';
 import beneficiarios from '@/routes/beneficiarios';
 
-type Beneficiario = { id: number; nombre: string };
+type Beneficiario = {
+    id: number;
+    nombre: string;
+    rfc: string | null;
+    curp: string | null;
+};
 
 export default function BeneficiarioEdit({
     beneficiario,
@@ -40,6 +45,35 @@ export default function BeneficiarioEdit({
                                     autoFocus
                                 />
                                 <InputError message={errors.nombre} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="rfc">RFC</Label>
+                                <Input
+                                    id="rfc"
+                                    name="rfc"
+                                    maxLength={13}
+                                    className="uppercase"
+                                    defaultValue={beneficiario.rfc ?? ''}
+                                />
+                                <InputError message={errors.rfc} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="curp">CURP</Label>
+                                <Input
+                                    id="curp"
+                                    name="curp"
+                                    maxLength={18}
+                                    className="uppercase"
+                                    defaultValue={beneficiario.curp ?? ''}
+                                />
+                                <InputError message={errors.curp} />
+                                <p className="text-xs text-muted-foreground">
+                                    Se llenan solos al capturarle un apoyo, y se
+                                    actualizan con los que se escriban en el
+                                    apoyo.
+                                </p>
                             </div>
 
                             <div className="flex gap-2">

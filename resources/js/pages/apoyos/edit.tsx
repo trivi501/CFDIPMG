@@ -20,6 +20,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { camposAlCambiarBeneficiario } from '@/lib/beneficiarios';
+import type { DatosBeneficiario } from '@/lib/beneficiarios';
 import { getXsrfToken } from '@/lib/csrf';
 import { fechaMx } from '@/lib/fechas';
 import type { LineaPaquete, Paquete } from '@/lib/paquetes';
@@ -28,7 +30,12 @@ import apoyos from '@/routes/apoyos';
 import beneficiariosRoutes from '@/routes/beneficiarios';
 import facturasCompra from '@/routes/facturas-compra';
 
-type Beneficiario = { id: number; nombre: string };
+type Beneficiario = {
+    id: number;
+    nombre: string;
+    rfc: string | null;
+    curp: string | null;
+};
 type PersonaApoya = { id: number; nombre: string };
 
 type ArticuloDisponible = {
@@ -131,6 +138,29 @@ export default function ApoyoEdit({
         })),
     );
 
+    // RFC y CURP guardados de cada beneficiario: al elegirlo se llenan solos.
+    const [datosBeneficiarios, setDatosBeneficiarios] = useState<
+        Record<string, DatosBeneficiario>
+    >(() =>
+        Object.fromEntries(
+            beneficiarios.map((beneficiario) => [
+                String(beneficiario.id),
+                beneficiario,
+            ]),
+        ),
+    );
+
+    const elegirBeneficiario = (value: string) =>
+        setData((actual) => ({
+            ...actual,
+            beneficiario_id: value,
+            ...camposAlCambiarBeneficiario(
+                actual,
+                datosBeneficiarios[actual.beneficiario_id],
+                datosBeneficiarios[value],
+            ),
+        }));
+
     const createBeneficiario = async (
         nombre: string,
     ): Promise<ComboboxOption | null> => {
@@ -149,8 +179,12 @@ export default function ApoyoEdit({
             return null;
         }
 
-        const created: { id: number; nombre: string } = await response.json();
+        const created: Beneficiario = await response.json();
         const option = { value: String(created.id), label: created.nombre };
+        setDatosBeneficiarios((datos) => ({
+            ...datos,
+            [option.value]: created,
+        }));
         setBeneficiarioOptions((options) => [...options, option]);
 
         return option;
@@ -400,9 +434,7 @@ export default function ApoyoEdit({
                                     id="beneficiario_id"
                                     options={beneficiarioOptions}
                                     value={data.beneficiario_id}
-                                    onChange={(value) =>
-                                        setData('beneficiario_id', value)
-                                    }
+                                    onChange={elegirBeneficiario}
                                     onCreate={createBeneficiario}
                                     placeholder="Busca o crea un beneficiario"
                                 />

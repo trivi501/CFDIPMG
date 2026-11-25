@@ -52,6 +52,7 @@ class ApoyoController extends Controller
             'desde' => ['nullable', 'date_format:Y-m-d'],
             'hasta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:desde'],
             'area' => ['nullable', 'integer'],
+            'factura' => ['nullable', 'integer'],
         ]);
         $puedeVerTodo = $request->user()->can('apoyos.view-all');
 
@@ -62,13 +63,25 @@ class ApoyoController extends Controller
                 $query->where(function (Builder $query) use ($buscar) {
                     $query->whereHas('beneficiario', fn (Builder $q) => $q->where('nombre', 'like', "%{$buscar}%"))
                         ->orWhereHas('personaApoya', fn (Builder $q) => $q->where('nombre', 'like', "%{$buscar}%"))
-                        ->orWhere('rfc', 'like', "%{$buscar}%");
+                        ->orWhere('rfc', 'like', "%{$buscar}%")
+                        ->orWhere('curp', 'like', "%{$buscar}%")
+                        // Proveedor o UUID de la factura de compra de la que salieron los artículos.
+                        ->orWhereHas('detalles.articuloFacturaCompra.facturaCompra', fn (Builder $q) => $q
+                            ->where('emisor', 'like', "%{$buscar}%")
+                            ->orWhere('uuid', 'like', "%{$buscar}%"))
+                        // UUID o folio de la factura timbrada del apoyo.
+                        ->orWhereHas('invoice', fn (Builder $q) => $q
+                            ->where('uuid', 'like', "%{$buscar}%")
+                            ->orWhere('folio', 'like', "%{$buscar}%"));
                 });
             })
             ->when($filtros['desde'] ?? null, fn (Builder $query, string $desde) => $query->whereDate('fecha', '>=', $desde))
             ->when($filtros['hasta'] ?? null, fn (Builder $query, string $hasta) => $query->whereDate('fecha', '<=', $hasta))
             // Quien solo ve su área no necesita este filtro; visibleApoyos ya lo limita.
             ->when($puedeVerTodo && isset($filtros['area']) ? (int) $filtros['area'] : null, fn (Builder $query, int $area) => $query->where('area_id', $area))
+            // Los apoyos que tomaron artículos de una factura de compra (enlace desde Facturas de compra).
+            ->when(isset($filtros['factura']) ? (int) $filtros['factura'] : null, fn (Builder $query, int $factura) => $query
+                ->whereHas('detalles.articuloFacturaCompra', fn (Builder $q) => $q->where('factura_compra_id', $factura)))
             ->latest('fecha')
             ->paginate(15)
             ->withQueryString()
@@ -85,7 +98,11 @@ class ApoyoController extends Controller
 
         return Inertia::render('apoyos/index', [
             'apoyos' => $apoyos,
-            'filters' => Arr::only($filtros, ['estatus', 'buscar', 'desde', 'hasta', 'area']),
+            'filters' => Arr::only($filtros, ['estatus', 'buscar', 'desde', 'hasta', 'area', 'factura']),
+            // Para mostrar de qué factura es el filtro (solo si el usuario la puede ver).
+            'facturaFiltrada' => isset($filtros['factura'])
+                ? FacturaCompra::visiblePara($request->user())->find((int) $filtros['factura'], ['id', 'uuid', 'emisor', 'fecha', 'total'])
+                : null,
             'areas' => $puedeVerTodo ? Area::orderBy('nombre')->get(['id', 'nombre']) : [],
             // Cuántos tomarían "Aprobar todo" y "Facturar todo", sin importar el filtro ni la página.
             'pendientes' => [
@@ -98,7 +115,7 @@ class ApoyoController extends Controller
     public function create(Request $request): Response
     {
         return Inertia::render('apoyos/create', [
-            'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre']),
+            'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre', 'rfc', 'curp']),
             'personasApoya' => PersonaApoya::orderBy('nombre')->get(['id', 'nombre']),
             'facturasDisponibles' => $this->facturasDisponibles($request),
             'paquetes' => $this->paquetesDisponibles($request),
@@ -131,6 +148,8 @@ class ApoyoController extends Controller
             foreach ($data['detalles'] as $detalle) {
                 $apoyo->detalles()->create($this->lineWithTotals($detalle));
             }
+
+            Beneficiario::whereKey($data['beneficiario_id'])->first()?->recordarDatos($data['rfc'] ?? null, $data['curp'] ?? null);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Apoyo creado.']);
@@ -205,7 +224,7 @@ class ApoyoController extends Controller
 
         return Inertia::render('apoyos/edit', [
             'apoyo' => $apoyo,
-            'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre']),
+            'beneficiarios' => Beneficiario::orderBy('nombre')->get(['id', 'nombre', 'rfc', 'curp']),
             'personasApoya' => PersonaApoya::orderBy('nombre')->get(['id', 'nombre']),
             'facturasDisponibles' => $this->facturasDisponibles($request),
             'paquetes' => $this->paquetesDisponibles($request),
@@ -249,6 +268,8 @@ class ApoyoController extends Controller
             foreach ($data['detalles'] as $detalle) {
                 $apoyo->detalles()->create($this->lineWithTotals($detalle));
             }
+
+            Beneficiario::whereKey($data['beneficiario_id'])->first()?->recordarDatos($data['rfc'] ?? null, $data['curp'] ?? null);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Apoyo actualizado.']);

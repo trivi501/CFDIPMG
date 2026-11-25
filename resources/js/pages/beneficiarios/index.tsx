@@ -3,8 +3,8 @@ import { Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button';
 import Heading from '@/components/heading';
-import { Pagination  } from '@/components/pagination';
-import type {Paginator} from '@/components/pagination';
+import { Pagination } from '@/components/pagination';
+import type { Paginator } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,6 +23,8 @@ import beneficiarios from '@/routes/beneficiarios';
 type Beneficiario = {
     id: number;
     nombre: string;
+    rfc: string | null;
+    curp: string | null;
 };
 
 type PageProps = {
@@ -73,7 +75,7 @@ export default function BeneficiariosIndex({
                 <div className="relative max-w-sm">
                     <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
                     <Input
-                        placeholder="Buscar por nombre…"
+                        placeholder="Buscar por nombre, RFC o CURP…"
                         className="pl-8"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
@@ -85,6 +87,8 @@ export default function BeneficiariosIndex({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Nombre</TableHead>
+                                <TableHead>RFC</TableHead>
+                                <TableHead>CURP</TableHead>
                                 <TableHead className="text-right">
                                     Acciones
                                 </TableHead>
@@ -92,7 +96,7 @@ export default function BeneficiariosIndex({
                         </TableHeader>
                         <TableBody>
                             {paginator.data.length === 0 && (
-                                <TableEmpty colSpan={2}>
+                                <TableEmpty colSpan={4}>
                                     No hay beneficiarios registrados.
                                 </TableEmpty>
                             )}
@@ -100,6 +104,12 @@ export default function BeneficiariosIndex({
                                 <TableRow key={beneficiario.id}>
                                     <TableCell className="font-medium">
                                         {beneficiario.nombre}
+                                    </TableCell>
+                                    <TableCell className="font-mono text-xs">
+                                        {beneficiario.rfc ?? '—'}
+                                    </TableCell>
+                                    <TableCell className="font-mono text-xs">
+                                        {beneficiario.curp ?? '—'}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {can('apoyos.manage') && (
