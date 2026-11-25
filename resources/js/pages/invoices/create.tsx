@@ -15,8 +15,8 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
     cambiosPorClave,
-    claveDelCatalogo,
     ClavesSatSugerencias,
+    ConceptosDeClave,
     LISTA_CLAVES_SAT,
 } from '@/lib/claves-sat';
 import type { ClaveSat } from '@/lib/claves-sat';
@@ -398,15 +398,13 @@ export default function InvoiceCreate({
                                                 maxLength={8}
                                                 required
                                             />
-                                            {claveDelCatalogo(
-                                                clavesSat,
-                                                item.sat_product_key,
-                                            ) && (
-                                                <p className="text-xs text-green-600 dark:text-green-400">
-                                                    Unidad y concepto tomados
-                                                    del catálogo de claves SAT.
-                                                </p>
-                                            )}
+                                            <ConceptosDeClave
+                                                claves={clavesSat}
+                                                linea={item}
+                                                onElegir={(cambios) =>
+                                                    updateItem(index, cambios)
+                                                }
+                                            />
                                         </div>
                                         <div className="grid gap-2">
                                             <Label>Clave SAT unidad</Label>

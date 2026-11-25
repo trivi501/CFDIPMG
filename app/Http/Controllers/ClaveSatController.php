@@ -22,6 +22,7 @@ class ClaveSatController extends Controller
                     ->orWhere('concepto', 'like', "%{$search}%"));
             })
             ->orderBy('clave')
+            ->orderBy('concepto')
             ->paginate(15)
             ->withQueryString();
 
@@ -70,12 +71,13 @@ class ClaveSatController extends Controller
 
     /**
      * Para los formularios de factura: al escribir una clave se llenan solos su unidad y concepto.
+     * Una clave puede venir varias veces, una por concepto.
      *
      * @return Collection<int, ClaveSat>
      */
     public static function paraFacturar(): Collection
     {
-        return ClaveSat::orderBy('clave')->get(['id', 'clave', 'unidad', 'concepto']);
+        return ClaveSat::orderBy('clave')->orderBy('concepto')->get(['id', 'clave', 'unidad', 'concepto']);
     }
 
     /**
@@ -86,14 +88,24 @@ class ClaveSatController extends Controller
         $request->merge([
             'clave' => trim((string) $request->input('clave')),
             'unidad' => mb_strtoupper(trim((string) $request->input('unidad'))),
+            'concepto' => trim((string) $request->input('concepto')),
         ]);
 
         return $request->validate([
-            'clave' => ['required', 'digits:8', Rule::unique('claves_sat', 'clave')->ignore($claveSat)],
+            'clave' => ['required', 'digits:8'],
             'unidad' => ['required', 'string', 'max:3'],
-            'concepto' => ['required', 'string', 'max:255'],
+            // La clave se puede repetir con otro concepto, no con el mismo.
+            'concepto' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('claves_sat', 'concepto')
+                    ->where('clave', $request->string('clave')->toString())
+                    ->ignore($claveSat),
+            ],
         ], [
             'clave.digits' => 'La clave de producto o servicio del SAT tiene 8 dígitos.',
+            'concepto.unique' => 'Esa clave ya tiene registrado ese mismo concepto.',
         ]);
     }
 }

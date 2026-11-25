@@ -64,10 +64,10 @@ class ClaveSatTest extends TestCase
         $this->assertModelMissing($clave);
     }
 
-    public function test_la_clave_tiene_8_digitos_y_no_se_repite(): void
+    public function test_la_clave_tiene_8_digitos_y_se_repite_solo_con_otro_concepto(): void
     {
         $user = $this->usuario();
-        ClaveSat::create(['clave' => '84111506', 'unidad' => 'E48', 'concepto' => 'Servicios']);
+        $servicios = ClaveSat::create(['clave' => '84111506', 'unidad' => 'E48', 'concepto' => 'Servicios']);
 
         $this->actingAs($user)->post('/claves-sat', [
             'clave' => '8411',
@@ -78,10 +78,43 @@ class ClaveSatTest extends TestCase
         $this->actingAs($user)->post('/claves-sat', [
             'clave' => '84111506',
             'unidad' => 'E48',
-            'concepto' => 'Repetida',
-        ])->assertSessionHasErrors(['clave' => 'El valor de clave ya está registrado.']);
+            'concepto' => ' Servicios ',
+        ])->assertSessionHasErrors(['concepto' => 'Esa clave ya tiene registrado ese mismo concepto.']);
 
-        $this->assertSame(1, ClaveSat::count());
+        $this->actingAs($user)->post('/claves-sat', [
+            'clave' => '84111506',
+            'unidad' => 'ACT',
+            'concepto' => 'Servicio de cobranza',
+        ])->assertSessionHasNoErrors()->assertRedirect('/claves-sat');
+
+        $this->assertSame(2, ClaveSat::where('clave', '84111506')->count());
+
+        // Editar sin cambiar el concepto no choca consigo misma; tomar el de la otra, sí.
+        $this->actingAs($user)->put("/claves-sat/{$servicios->id}", [
+            'clave' => '84111506',
+            'unidad' => 'H87',
+            'concepto' => 'Servicios',
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($user)->put("/claves-sat/{$servicios->id}", [
+            'clave' => '84111506',
+            'unidad' => 'E48',
+            'concepto' => 'Servicio de cobranza',
+        ])->assertSessionHasErrors('concepto');
+
+        // El mismo concepto con otra clave sí se puede.
+        $this->actingAs($user)->post('/claves-sat', [
+            'clave' => '93161700',
+            'unidad' => 'E48',
+            'concepto' => 'Servicios',
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($user)->get('/invoices/create')->assertInertia(
+            fn ($page) => $page->has('clavesSat', 3)
+                ->where('clavesSat.0.concepto', 'Servicio de cobranza')
+                ->where('clavesSat.1.concepto', 'Servicios')
+                ->where('clavesSat.2.clave', '93161700')
+        );
     }
 
     public function test_quien_solo_consulta_ve_el_catalogo_pero_no_lo_modifica(): void
