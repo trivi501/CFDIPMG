@@ -1,4 +1,5 @@
 import { createInertiaApp } from '@inertiajs/react';
+import { PantallaCargando } from '@/components/pantalla-cargando';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
@@ -28,12 +29,12 @@ createInertiaApp({
             <TooltipProvider delayDuration={0}>
                 {app}
                 <Toaster />
+                <PantallaCargando />
             </TooltipProvider>
         );
     },
-    progress: {
-        color: '#4B5563',
-    },
+    // En lugar de la barra de progreso, PantallaCargando muestra el emblema.
+    progress: false,
 });
 
 // This will set light / dark mode on load...

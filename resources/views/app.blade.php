@@ -43,6 +43,49 @@
         </x-inertia::head>
     </head>
     <body class="font-sans antialiased">
+        {{-- Mientras arranca la app; lo quita resources/js/components/pantalla-cargando.tsx. --}}
+        <div id="cargando-inicial" role="status" aria-live="polite">
+            <div class="cargando-caja">
+                <div class="cargando-anillo"></div>
+                <img src="/img/logo-emblema.png" alt="">
+            </div>
+            <span>Cargando…</span>
+        </div>
+        <style>
+            #cargando-inicial {
+                position: fixed;
+                inset: 0;
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 16px;
+                background: #fff;
+            }
+            html.dark #cargando-inicial { background: oklch(0.145 0 0); }
+            #cargando-inicial .cargando-caja {
+                position: relative;
+                width: 120px;
+                height: 120px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            #cargando-inicial .cargando-anillo {
+                position: absolute;
+                inset: 0;
+                border-radius: 50%;
+                border: 4px solid rgba(122, 52, 70, .15);
+                border-top-color: #7a3446;
+                border-right-color: #c4956f;
+                animation: cargando-girar .9s linear infinite;
+            }
+            #cargando-inicial img { height: 64px; }
+            #cargando-inicial span { color: #7a3446; font-weight: 600; font-family: sans-serif; letter-spacing: .5px; }
+            html.dark #cargando-inicial span { color: #c4956f; }
+            @keyframes cargando-girar { to { transform: rotate(360deg); } }
+        </style>
         <x-inertia::app />
     </body>
 </html>

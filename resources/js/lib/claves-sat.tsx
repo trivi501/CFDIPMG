@@ -1,5 +1,3 @@
-import { cn } from '@/lib/utils';
-
 /** Clave de producto o servicio del catálogo "Claves SAT" (App\Models\ClaveSat). */
 export type ClaveSat = {
     id: number;
@@ -31,8 +29,8 @@ export function conceptosDeClave(
  * Cambios a una línea de factura al escribir una clave. Si la clave está en el catálogo se llenan
  * su unidad y su concepto; el concepto solo si estaba vacío o seguía siendo el de otra clave del
  * catálogo, para no pisar lo que el usuario escribió a mano. Si la clave tiene varios conceptos y
- * la descripción ya es uno de ellos, se queda ese; si no, se toma el primero (y se puede cambiar
- * con ConceptosDeClave).
+ * la descripción ya es uno de ellos, se queda ese; si no, se toma el primero (otro se elige
+ * escribiendo en la descripción).
  */
 export function cambiosPorClave(
     claves: ClaveSat[],
@@ -60,71 +58,22 @@ export function cambiosPorClave(
     return cambios;
 }
 
-/**
- * Aviso bajo el campo de clave: si la clave está en el catálogo con un concepto, que se tomaron de
- * ahí; si tiene varios, botones para elegir cuál poner en la línea.
- */
-export function ConceptosDeClave({
+/** Aviso bajo el campo de clave cuando la clave está en el catálogo. */
+export function AvisoClaveDelCatalogo({
     claves,
-    linea,
-    onElegir,
+    clave,
 }: {
     claves: ClaveSat[];
-    linea: Linea;
-    onElegir: (cambios: Partial<Linea>) => void;
+    clave: string;
 }) {
-    const opciones = conceptosDeClave(claves, linea.sat_product_key);
-
-    if (opciones.length === 0) {
+    if (conceptosDeClave(claves, clave).length === 0) {
         return null;
     }
 
-    if (opciones.length === 1) {
-        return (
-            <p className="text-xs text-green-600 dark:text-green-400">
-                Unidad y concepto tomados del catálogo de claves SAT.
-            </p>
-        );
-    }
-
     return (
-        <div className="grid gap-1">
-            <p className="text-xs text-muted-foreground">
-                Esta clave tiene {opciones.length} conceptos en el catálogo.
-                Elige uno:
-            </p>
-            <div className="flex flex-wrap gap-1">
-                {opciones.map((c) => {
-                    const actual =
-                        c.concepto === linea.description &&
-                        c.unidad === linea.sat_unit_key;
-
-                    return (
-                        <button
-                            key={c.id}
-                            type="button"
-                            onClick={() =>
-                                onElegir({
-                                    description: c.concepto,
-                                    sat_unit_key: c.unidad,
-                                })
-                            }
-                            aria-pressed={actual}
-                            className={cn(
-                                'rounded-md border px-2 py-0.5 text-left text-xs hover:bg-accent',
-                                actual &&
-                                    'border-green-600 bg-green-50 text-green-700 dark:border-green-400 dark:bg-green-950 dark:text-green-300',
-                            )}
-                        >
-                            {c.concepto}{' '}
-                            <span className="font-mono text-muted-foreground">
-                                ({c.unidad})
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
+        <p className="text-xs text-green-600 dark:text-green-400">
+            Unidad y concepto tomados del catálogo de claves SAT.
+        </p>
     );
 }
 

@@ -14,9 +14,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
+    AvisoClaveDelCatalogo,
     cambiosPorClave,
     ClavesSatSugerencias,
-    ConceptosDeClave,
     LISTA_CLAVES_SAT,
 } from '@/lib/claves-sat';
 import type { ClaveSat } from '@/lib/claves-sat';
@@ -398,12 +398,9 @@ export default function InvoiceCreate({
                                                 maxLength={8}
                                                 required
                                             />
-                                            <ConceptosDeClave
+                                            <AvisoClaveDelCatalogo
                                                 claves={clavesSat}
-                                                linea={item}
-                                                onElegir={(cambios) =>
-                                                    updateItem(index, cambios)
-                                                }
+                                                clave={item.sat_product_key}
                                             />
                                         </div>
                                         <div className="grid gap-2">
