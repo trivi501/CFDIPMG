@@ -1,8 +1,8 @@
 import { router } from '@inertiajs/react';
-import { Building2, FileText, Landmark, Users } from 'lucide-react';
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import type { ApexOptions } from 'apexcharts';
+import { Building2, FileText, Landmark } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import Chart from 'react-apexcharts';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 
@@ -27,17 +27,58 @@ const PERIODOS: { value: Graficas['periodo']; label: string }[] = [
     { value: 'todo', label: 'Todo' },
 ];
 
-const moneda = new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-});
+const MEDIDAS: { value: Medida; label: string }[] = [
+    { value: 'monto', label: 'Monto' },
+    { value: 'facturas', label: 'Facturas' },
+];
 
-const monedaCorta = new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-    notation: 'compact',
-    maximumFractionDigits: 1,
-});
+// Misma paleta que el panel de siemg: azul de la paleta categórica validada para cada tema.
+const PALETA = {
+    claro: {
+        serie: '#2a78d6',
+        rejilla: '#ececea',
+        texto: '#6b6a66',
+        fuerte: '#0b0b0b',
+    },
+    oscuro: {
+        serie: '#3987e5',
+        rejilla: '#2a2a28',
+        texto: '#a3a29b',
+        fuerte: '#f0efec',
+    },
+};
+
+const dinero = (v: number) =>
+    '$' + v.toLocaleString('es-MX', { maximumFractionDigits: 0 });
+
+const dineroCorto = (v: number) => {
+    const abs = Math.abs(v);
+
+    if (abs >= 1_000_000) {
+        return (
+            '$' +
+            (v / 1_000_000).toLocaleString('es-MX', {
+                maximumFractionDigits: 1,
+            }) +
+            ' M'
+        );
+    }
+
+    if (abs >= 1_000) {
+        return (
+            '$' +
+            (v / 1_000).toLocaleString('es-MX', {
+                maximumFractionDigits: abs < 10_000 ? 1 : 0,
+            }) +
+            ' mil'
+        );
+    }
+
+    return dinero(v);
+};
+
+const facturasTexto = (n: number) =>
+    `${n.toLocaleString('es-MX')} ${n === 1 ? 'factura' : 'facturas'}`;
 
 const nombreMes = new Intl.DateTimeFormat('es-MX', { month: 'short' });
 const nombreMesLargo = new Intl.DateTimeFormat('es-MX', {
@@ -51,177 +92,117 @@ function fechaDeMes(mes: string): Date {
     return new Date(anio, numero - 1, 1);
 }
 
-function facturasTexto(n: number): string {
-    return `${n} ${n === 1 ? 'factura' : 'facturas'}`;
-}
+/** true cuando la app está en tema oscuro (clase `dark` en <html>); se actualiza al cambiar el tema. */
+function useEsOscuro() {
+    const [oscuro, setOscuro] = useState(
+        () =>
+            typeof document !== 'undefined' &&
+            document.documentElement.classList.contains('dark'),
+    );
 
-function valor(fila: Resumen, medida: Medida): number {
-    return medida === 'monto' ? fila.monto : fila.facturas;
-}
-
-/** Barras horizontales: una fila por área o usuario, con su número a la derecha. */
-function Barras({ filas, medida }: { filas: Fila[]; medida: Medida }) {
-    const maximo = Math.max(...filas.map((fila) => valor(fila, medida)), 0);
-
-    if (filas.length === 0) {
-        return (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-                No hay facturas en este periodo.
-            </p>
+    useEffect(() => {
+        const observador = new MutationObserver(() =>
+            setOscuro(document.documentElement.classList.contains('dark')),
         );
-    }
+        observador.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class'],
+        });
 
+        return () => observador.disconnect();
+    }, []);
+
+    return oscuro;
+}
+
+/** Opciones comunes de ApexCharts para todas las gráficas del panel (igual que en siemg). */
+function opcionesBase(oscuro: boolean, medida: Medida): ApexOptions {
+    const p = oscuro ? PALETA.oscuro : PALETA.claro;
+
+    return {
+        chart: {
+            fontFamily: 'inherit',
+            foreColor: p.texto,
+            background: 'transparent',
+            toolbar: { show: false },
+            zoom: { enabled: false },
+            animations: { enabled: true, speed: 450 },
+            parentHeightOffset: 0,
+        },
+        theme: { mode: oscuro ? 'dark' : 'light' },
+        colors: [p.serie],
+        grid: {
+            borderColor: p.rejilla,
+            strokeDashArray: 0,
+            xaxis: { lines: { show: false } },
+            padding: { left: 6, right: 6 },
+        },
+        dataLabels: { enabled: false },
+        legend: { show: false },
+        tooltip: {
+            theme: oscuro ? 'dark' : 'light',
+            style: { fontSize: '12px' },
+        },
+        yaxis: {
+            labels: {
+                formatter: (v: number) =>
+                    medida === 'monto'
+                        ? dineroCorto(v)
+                        : Math.round(v).toLocaleString('es-MX'),
+            },
+        },
+        xaxis: { axisBorder: { show: false }, axisTicks: { show: false } },
+        states: { active: { filter: { type: 'none' } } },
+    };
+}
+
+/** Texto del tooltip: la medida elegida primero y la otra como contexto. */
+function detalle(fila: Resumen, medida: Medida): string {
+    return medida === 'monto'
+        ? `${dinero(fila.monto)} · ${facturasTexto(fila.facturas)}`
+        : `${facturasTexto(fila.facturas)} · ${dinero(fila.monto)}`;
+}
+
+function Tarjeta({
+    children,
+    className = '',
+}: {
+    children: React.ReactNode;
+    className?: string;
+}) {
     return (
-        <ul className="space-y-3">
-            {filas.map((fila) => {
-                const ancho =
-                    maximo > 0 ? (valor(fila, medida) / maximo) * 100 : 0;
-
-                return (
-                    <li
-                        key={fila.id}
-                        className="group rounded-md px-2 py-1.5 transition-colors hover:bg-muted/60"
-                        title={`${fila.nombre}: ${facturasTexto(fila.facturas)} · ${moneda.format(fila.monto)}`}
-                    >
-                        <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
-                            <span className="truncate font-medium">
-                                {fila.nombre}
-                            </span>
-                            <span className="shrink-0 text-muted-foreground tabular-nums">
-                                {medida === 'monto' ? (
-                                    <>
-                                        <span className="font-medium text-foreground">
-                                            {moneda.format(fila.monto)}
-                                        </span>
-                                        {' · '}
-                                        {facturasTexto(fila.facturas)}
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="font-medium text-foreground">
-                                            {facturasTexto(fila.facturas)}
-                                        </span>
-                                        {' · '}
-                                        {moneda.format(fila.monto)}
-                                    </>
-                                )}
-                            </span>
-                        </div>
-                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-grafica-suave">
-                            <div
-                                className="h-full rounded-full bg-grafica transition-[width] duration-500 ease-out"
-                                style={{ width: `${Math.max(ancho, 1.5)}%` }}
-                            />
-                        </div>
-                    </li>
-                );
-            })}
-        </ul>
+        <div
+            className={cn(
+                'rounded-xl border bg-card text-card-foreground shadow-xs',
+                className,
+            )}
+        >
+            {children}
+        </div>
     );
 }
 
-/** Columnas por mes (últimos 12), con el detalle al pasar el mouse. */
-function Meses({
-    meses,
-    medida,
+function Grafica({
+    titulo,
+    subtitulo,
+    children,
+    className = '',
 }: {
-    meses: Graficas['porMes'];
-    medida: Medida;
+    titulo: string;
+    subtitulo?: string;
+    children: React.ReactNode;
+    className?: string;
 }) {
-    const [activo, setActivo] = useState<number | null>(null);
-    const maximo = Math.max(...meses.map((mes) => valor(mes, medida)), 0);
-    const marcas = [1, 0.5, 0];
-
     return (
-        <div className="flex gap-3">
-            <div className="flex h-48 flex-col justify-between pb-6 text-right text-xs text-muted-foreground tabular-nums">
-                {marcas.map((marca) => (
-                    <span key={marca} className="-translate-y-1/2 leading-none">
-                        {medida === 'monto'
-                            ? monedaCorta.format(maximo * marca)
-                            : Math.round(maximo * marca)}
-                    </span>
-                ))}
+        <Tarjeta className={cn('p-4', className)}>
+            <div className="mb-2">
+                <h3 className="text-sm font-semibold">{titulo}</h3>
+                {subtitulo && (
+                    <p className="text-xs text-muted-foreground">{subtitulo}</p>
+                )}
             </div>
-            <div className="relative flex-1">
-                <div className="pointer-events-none absolute inset-x-0 top-0 bottom-6 flex flex-col justify-between">
-                    {marcas.map((marca) => (
-                        <div
-                            key={marca}
-                            className={cn(
-                                'border-t',
-                                marca === 0
-                                    ? 'border-border'
-                                    : 'border-dashed border-border/60',
-                            )}
-                        />
-                    ))}
-                </div>
-                <div
-                    className="relative flex h-48 items-end gap-1 sm:gap-2"
-                    onMouseLeave={() => setActivo(null)}
-                >
-                    {meses.map((mes, indice) => {
-                        const alto =
-                            maximo > 0
-                                ? (valor(mes, medida) / maximo) * 100
-                                : 0;
-                        const fecha = fechaDeMes(mes.mes);
-
-                        return (
-                            <div
-                                key={mes.mes}
-                                className="relative flex h-full flex-1 flex-col justify-end"
-                                onMouseEnter={() => setActivo(indice)}
-                                onFocus={() => setActivo(indice)}
-                                onBlur={() => setActivo(null)}
-                                tabIndex={0}
-                                aria-label={`${nombreMesLargo.format(fecha)}: ${facturasTexto(mes.facturas)}, ${moneda.format(mes.monto)}`}
-                            >
-                                <div className="flex flex-1 items-end pb-6">
-                                    <div
-                                        className={cn(
-                                            'mx-auto w-full max-w-10 rounded-t-[4px] bg-grafica transition-all duration-500 ease-out',
-                                            activo !== null &&
-                                                activo !== indice &&
-                                                'opacity-40',
-                                        )}
-                                        style={{
-                                            height: `${alto}%`,
-                                            minHeight:
-                                                valor(mes, medida) > 0 ? 3 : 0,
-                                        }}
-                                    />
-                                </div>
-                                <span className="absolute inset-x-0 bottom-0 text-center text-[11px] text-muted-foreground capitalize">
-                                    {nombreMes.format(fecha).replace('.', '')}
-                                </span>
-                                {activo === indice && (
-                                    <div
-                                        className={cn(
-                                            'pointer-events-none absolute bottom-full z-10 mb-1 rounded-md border bg-popover px-3 py-2 text-xs whitespace-nowrap text-popover-foreground shadow-md',
-                                            indice < 2
-                                                ? 'left-0'
-                                                : indice > meses.length - 3
-                                                  ? 'right-0'
-                                                  : 'left-1/2 -translate-x-1/2',
-                                        )}
-                                    >
-                                        <p className="font-medium capitalize">
-                                            {nombreMesLargo.format(fecha)}
-                                        </p>
-                                        <p className="text-muted-foreground tabular-nums">
-                                            {facturasTexto(mes.facturas)} ·{' '}
-                                            {moneda.format(mes.monto)}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
+            {children}
+        </Tarjeta>
     );
 }
 
@@ -229,31 +210,237 @@ function Indicador({
     icono: Icono,
     titulo,
     valor,
+    nota,
 }: {
     icono: typeof FileText;
     titulo: string;
     valor: string;
+    nota?: string;
 }) {
     return (
-        <div className="flex items-center gap-3 rounded-lg border bg-card p-4">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-grafica-suave text-grafica">
-                <Icono className="size-5" />
-            </div>
-            <div className="min-w-0">
-                <p className="text-sm text-muted-foreground">{titulo}</p>
-                <p className="truncate text-xl font-semibold tabular-nums">
-                    {valor}
-                </p>
-            </div>
+        <Tarjeta className="p-4">
+            <p className="text-xs font-medium text-muted-foreground">
+                {titulo}
+            </p>
+            <p className="mt-1 flex items-center gap-2 text-2xl font-semibold tabular-nums">
+                <Icono className="h-5 w-5 text-muted-foreground" />
+                {valor}
+            </p>
+            {nota && (
+                <p className="mt-2 text-xs text-muted-foreground">{nota}</p>
+            )}
+        </Tarjeta>
+    );
+}
+
+function SinDatos({ texto, alto }: { texto: string; alto: number }) {
+    return (
+        <div
+            className="flex items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground"
+            style={{ height: alto }}
+        >
+            {texto}
         </div>
+    );
+}
+
+/** Selector segmentado con el mismo estilo que el panel de siemg. */
+function Segmentos<T extends string>({
+    opciones,
+    valor,
+    onCambio,
+    etiqueta,
+}: {
+    opciones: { value: T; label: string }[];
+    valor: T;
+    onCambio: (valor: T) => void;
+    etiqueta: string;
+}) {
+    return (
+        <div
+            role="group"
+            aria-label={etiqueta}
+            className="inline-flex rounded-md border p-0.5 text-xs"
+        >
+            {opciones.map((opcion) => (
+                <button
+                    key={opcion.value}
+                    type="button"
+                    aria-pressed={valor === opcion.value}
+                    onClick={() => onCambio(opcion.value)}
+                    className={cn(
+                        'rounded px-2 py-1',
+                        valor === opcion.value
+                            ? 'bg-foreground text-background'
+                            : 'text-muted-foreground hover:text-foreground',
+                    )}
+                >
+                    {opcion.label}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+/** Barras horizontales: una por área o usuario, con su valor a la derecha. */
+function Barras({
+    filas,
+    medida,
+    oscuro,
+    clave,
+}: {
+    filas: Fila[];
+    medida: Medida;
+    oscuro: boolean;
+    clave: string;
+}) {
+    if (filas.length === 0) {
+        return <SinDatos texto="No hay facturas en este periodo." alto={160} />;
+    }
+
+    const p = oscuro ? PALETA.oscuro : PALETA.claro;
+    const base = opcionesBase(oscuro, medida);
+    const opciones: ApexOptions = {
+        ...base,
+        chart: { ...base.chart, type: 'bar' },
+        plotOptions: {
+            bar: {
+                horizontal: true,
+                barHeight: '62%',
+                borderRadius: 4,
+                borderRadiusApplication: 'end',
+                dataLabels: { position: 'top' },
+            },
+        },
+        dataLabels: {
+            enabled: true,
+            formatter: (v: number) =>
+                medida === 'monto' ? dineroCorto(v) : v.toLocaleString('es-MX'),
+            offsetX: 34,
+            style: { fontSize: '11px', fontWeight: 600, colors: [p.fuerte] },
+        },
+        xaxis: {
+            ...base.xaxis,
+            categories: filas.map((fila) => fila.nombre),
+            labels: {
+                formatter: (v: string) =>
+                    medida === 'monto'
+                        ? dineroCorto(Number(v))
+                        : Number(v).toLocaleString('es-MX'),
+            },
+        },
+        yaxis: { labels: { maxWidth: 180 } },
+        grid: {
+            ...base.grid,
+            xaxis: { lines: { show: true } },
+            yaxis: { lines: { show: false } },
+            padding: { right: 44 },
+        },
+        tooltip: {
+            ...base.tooltip,
+            y: {
+                formatter: (_v: number, opts) =>
+                    detalle(filas[opts?.dataPointIndex ?? 0], medida),
+                title: { formatter: () => '' },
+            },
+        },
+    };
+
+    return (
+        <Chart
+            key={`${clave}-${oscuro}-${medida}`}
+            type="bar"
+            height={Math.max(160, filas.length * 44 + 40)}
+            options={opciones}
+            series={[
+                {
+                    name: medida === 'monto' ? 'Monto' : 'Facturas',
+                    data: filas.map((fila) => fila[medida]),
+                },
+            ]}
+        />
+    );
+}
+
+/** Área con degradado de los últimos 12 meses. */
+function Meses({
+    meses,
+    medida,
+    oscuro,
+}: {
+    meses: Graficas['porMes'];
+    medida: Medida;
+    oscuro: boolean;
+}) {
+    if (meses.every((mes) => mes.facturas === 0)) {
+        return (
+            <SinDatos
+                texto="No hay facturas en los últimos 12 meses."
+                alto={290}
+            />
+        );
+    }
+
+    const base = opcionesBase(oscuro, medida);
+    const opciones: ApexOptions = {
+        ...base,
+        chart: { ...base.chart, type: 'area' },
+        stroke: { curve: 'smooth', width: 2 },
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shadeIntensity: 1,
+                opacityFrom: 0.45,
+                opacityTo: 0.05,
+                stops: [0, 95],
+            },
+        },
+        markers: { size: 0, hover: { size: 5 } },
+        xaxis: {
+            ...base.xaxis,
+            categories: meses.map((mes) =>
+                nombreMes.format(fechaDeMes(mes.mes)).replace('.', ''),
+            ),
+            tooltip: { enabled: false },
+        },
+        tooltip: {
+            ...base.tooltip,
+            x: {
+                formatter: (_v: number, opts) =>
+                    nombreMesLargo.format(
+                        fechaDeMes(meses[opts?.dataPointIndex ?? 0].mes),
+                    ),
+            },
+            y: {
+                formatter: (_v: number, opts) =>
+                    detalle(meses[opts?.dataPointIndex ?? 0], medida),
+                title: { formatter: () => '' },
+            },
+        },
+    };
+
+    return (
+        <Chart
+            key={`meses-${oscuro}-${medida}`}
+            type="area"
+            height={290}
+            options={opciones}
+            series={[
+                {
+                    name: medida === 'monto' ? 'Monto' : 'Facturas',
+                    data: meses.map((mes) => mes[medida]),
+                },
+            ]}
+        />
     );
 }
 
 export function DashboardGraficas({ graficas }: { graficas: Graficas }) {
     const [medida, setMedida] = useState<Medida>('monto');
+    const oscuro = useEsOscuro();
 
-    const cambiarPeriodo = (periodo: string) => {
-        if (!periodo || periodo === graficas.periodo) {
+    const cambiarPeriodo = (periodo: Graficas['periodo']) => {
+        if (periodo === graficas.periodo) {
             return;
         }
 
@@ -264,11 +451,18 @@ export function DashboardGraficas({ graficas }: { graficas: Graficas }) {
         );
     };
 
+    const totalMeses = graficas.porMes.reduce(
+        (suma, mes) => suma + mes.monto,
+        0,
+    );
+    const periodoTexto =
+        PERIODOS.find((p) => p.value === graficas.periodo)?.label ?? '';
+
     return (
         <section className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
-                    <h2 className="text-lg font-semibold">
+                    <h2 className="text-xl font-semibold tracking-tight">
                         Facturas de apoyos
                     </h2>
                     <p className="text-sm text-muted-foreground">
@@ -277,41 +471,18 @@ export function DashboardGraficas({ graficas }: { graficas: Graficas }) {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <ToggleGroup
-                        type="single"
-                        variant="outline"
-                        size="sm"
-                        value={graficas.periodo}
-                        onValueChange={cambiarPeriodo}
-                        aria-label="Periodo"
-                    >
-                        {PERIODOS.map((periodo) => (
-                            <ToggleGroupItem
-                                key={periodo.value}
-                                value={periodo.value}
-                                className="px-3"
-                            >
-                                {periodo.label}
-                            </ToggleGroupItem>
-                        ))}
-                    </ToggleGroup>
-                    <ToggleGroup
-                        type="single"
-                        variant="outline"
-                        size="sm"
-                        value={medida}
-                        onValueChange={(nueva) =>
-                            nueva && setMedida(nueva as Medida)
-                        }
-                        aria-label="Medir por"
-                    >
-                        <ToggleGroupItem value="monto" className="px-3">
-                            Monto
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="facturas" className="px-3">
-                            Facturas
-                        </ToggleGroupItem>
-                    </ToggleGroup>
+                    <Segmentos
+                        etiqueta="Periodo"
+                        opciones={PERIODOS}
+                        valor={graficas.periodo}
+                        onCambio={cambiarPeriodo}
+                    />
+                    <Segmentos
+                        etiqueta="Medir por"
+                        opciones={MEDIDAS}
+                        valor={medida}
+                        onCambio={setMedida}
+                    />
                 </div>
             </div>
 
@@ -319,58 +490,64 @@ export function DashboardGraficas({ graficas }: { graficas: Graficas }) {
                 <Indicador
                     icono={FileText}
                     titulo="Facturas en el periodo"
-                    valor={String(graficas.totales.facturas)}
+                    valor={graficas.totales.facturas.toLocaleString('es-MX')}
+                    nota={periodoTexto}
                 />
                 <Indicador
                     icono={Landmark}
                     titulo="Monto facturado"
-                    valor={moneda.format(graficas.totales.monto)}
+                    valor={dinero(graficas.totales.monto)}
+                    nota={periodoTexto}
                 />
                 <Indicador
                     icono={Building2}
                     titulo="Departamentos con facturas"
-                    valor={String(graficas.porArea.length)}
+                    valor={graficas.porArea.length.toLocaleString('es-MX')}
+                    nota={periodoTexto}
                 />
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <Building2 className="size-4 text-muted-foreground" />
-                            Por departamento
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Barras filas={graficas.porArea} medida={medida} />
-                    </CardContent>
-                </Card>
+            <div className="grid gap-4 xl:grid-cols-3">
+                <Grafica
+                    titulo="Últimos 12 meses"
+                    subtitulo={`${dinero(totalMeses)} facturados en el periodo`}
+                    className="xl:col-span-2"
+                >
+                    <Meses
+                        meses={graficas.porMes}
+                        medida={medida}
+                        oscuro={oscuro}
+                    />
+                </Grafica>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Últimos 12 meses
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Meses meses={graficas.porMes} medida={medida} />
-                    </CardContent>
-                </Card>
-
-                {graficas.porUsuario.map((area) => (
-                    <Card key={area.id}>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Users className="size-4 text-muted-foreground" />
-                                {area.nombre}: por usuario
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Barras filas={area.usuarios} medida={medida} />
-                        </CardContent>
-                    </Card>
-                ))}
+                <Grafica titulo="Por departamento" subtitulo={periodoTexto}>
+                    <Barras
+                        clave="areas"
+                        filas={graficas.porArea}
+                        medida={medida}
+                        oscuro={oscuro}
+                    />
+                </Grafica>
             </div>
+
+            {graficas.porUsuario.length > 0 && (
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {graficas.porUsuario.map((area) => (
+                        <Grafica
+                            key={area.id}
+                            titulo={`${area.nombre}: por usuario`}
+                            subtitulo={periodoTexto}
+                        >
+                            <Barras
+                                clave={`usuarios-${area.id}`}
+                                filas={area.usuarios}
+                                medida={medida}
+                                oscuro={oscuro}
+                            />
+                        </Grafica>
+                    ))}
+                </div>
+            )}
         </section>
     );
 }

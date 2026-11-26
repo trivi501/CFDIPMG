@@ -43,49 +43,43 @@ export default function Dashboard({
         <>
             <Head title="Dashboard" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-                <div className="grid auto-rows-min gap-4 md:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Recibos pendientes
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-2xl font-semibold">
-                            {stats.pendingReceipts}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Facturadas este mes
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-2xl font-semibold">
-                            {stats.invoicedThisMonth}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Recibos fallidos
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-2xl font-semibold">
-                            {stats.failedReceipts}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Monto facturado (mes)
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-2xl font-semibold">
-                            {currency.format(
+                <div className="grid auto-rows-min gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {[
+                        {
+                            titulo: 'Recibos pendientes',
+                            valor: stats.pendingReceipts.toLocaleString(
+                                'es-MX',
+                            ),
+                        },
+                        {
+                            titulo: 'Facturadas este mes',
+                            valor: stats.invoicedThisMonth.toLocaleString(
+                                'es-MX',
+                            ),
+                        },
+                        {
+                            titulo: 'Recibos fallidos',
+                            valor: stats.failedReceipts.toLocaleString('es-MX'),
+                        },
+                        {
+                            titulo: 'Monto facturado (mes)',
+                            valor: currency.format(
                                 Number(stats.totalAmountThisMonth),
-                            )}
-                        </CardContent>
-                    </Card>
+                            ),
+                        },
+                    ].map((tarjeta) => (
+                        <div
+                            key={tarjeta.titulo}
+                            className="rounded-xl border bg-card p-4 text-card-foreground shadow-xs"
+                        >
+                            <p className="text-xs font-medium text-muted-foreground">
+                                {tarjeta.titulo}
+                            </p>
+                            <p className="mt-1 text-2xl font-semibold tabular-nums">
+                                {tarjeta.valor}
+                            </p>
+                        </div>
+                    ))}
                 </div>
 
                 {graficas && <DashboardGraficas graficas={graficas} />}
